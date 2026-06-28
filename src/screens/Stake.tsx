@@ -76,10 +76,10 @@ export default function Stake({ v }: { v: MoolaVals }) {
         <div onClick={v.goMe} style={css('display:inline-flex;align-items:center;gap:7px;padding:9px 20px;border-radius:20px;background:rgba(8,16,38,.4);border:1px solid rgba(110,200,150,.2);font-size:14px;font-weight:600;cursor:pointer;margin-bottom:14px')}>🧮 Calculate income</div>
         <div style={css('font-size:13px;color:#92b8a3;margin-bottom:8px')}>Your referral link</div>
         <div style={css('display:flex;align-items:center;gap:8px;padding:5px 5px 5px 14px;border-radius:22px;background:rgba(8,16,38,.45);border:1px solid rgba(110,200,150,.18)')}>
-          <span style={css('flex:1;text-align:left;font-size:13px;color:#cfe7da;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>moola.app?rid=2103788</span>
+          <span style={css('flex:1;text-align:left;font-size:13px;color:#cfe7da;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{v.refLink}</span>
           <div onClick={v.copyRef} style={css('padding:8px 18px;border-radius:18px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:700;font-size:13px;cursor:pointer')}>{v.copyLabel}</div>
         </div>
-        <div style={css('font-size:12px;color:#92b8a3;margin-top:11px')}>Commission: <b style={css('color:#23d39a')}>0.000</b> $MOOLA</div>
+        <div style={css('font-size:12px;color:#92b8a3;margin-top:11px')}>Commission: <b style={css('color:#23d39a')}>{v.refCommissionStr}</b> $MOOLA</div>
       </div>
 
       {/* referral breakdown table */}

@@ -92,6 +92,25 @@ export function ensureSchema(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `
+
+      // ---- Referral columns + table (idempotent migrations) ----
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ref_code TEXT`
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT`
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS upline BIGINT[] NOT NULL DEFAULT '{}'`
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_ref_code_idx ON users(ref_code)`
+      await sql`CREATE INDEX IF NOT EXISTS users_upline_gin ON users USING GIN (upline)`
+      await sql`
+        CREATE TABLE IF NOT EXISTS referral_earnings (
+          id          BIGSERIAL PRIMARY KEY,
+          beneficiary BIGINT NOT NULL,
+          from_user   BIGINT NOT NULL,
+          level       INT NOT NULL,
+          buy_tokens  DOUBLE PRECISION NOT NULL,
+          commission  DOUBLE PRECISION NOT NULL,
+          created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `
+      await sql`CREATE INDEX IF NOT EXISTS ref_earn_beneficiary_idx ON referral_earnings(beneficiary)`
     })().catch((e) => {
       // Reset so a later request can retry schema creation.
       schemaReady = null

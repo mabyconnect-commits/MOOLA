@@ -48,9 +48,22 @@ export interface ApiTxn {
   pos: boolean
 }
 
+export interface RefRow {
+  refs: string
+  buy: string
+  comm: string
+}
+
+export interface ReferralData {
+  code: string
+  commissionStr: string
+  rows: RefRow[]
+}
+
 export interface AccountResponse {
   account: Account
   txns: ApiTxn[]
+  referral?: ReferralData
   token?: string
   email?: string
   needsDeposit?: boolean
@@ -102,8 +115,8 @@ async function request<T>(path: string, method: string, body?: unknown): Promise
 }
 
 export const api = {
-  signup: (email: string, password: string) =>
-    request<AuthChallenge>('/auth/signup', 'POST', { email, password }),
+  signup: (email: string, password: string, ref?: string) =>
+    request<AuthChallenge>('/auth/signup', 'POST', { email, password, ref: ref || '' }),
   verify: (email: string, code: string) =>
     request<AccountResponse>('/auth/verify', 'POST', { email, code }),
   resend: (email: string) => request<AuthChallenge>('/auth/resend', 'POST', { email }),

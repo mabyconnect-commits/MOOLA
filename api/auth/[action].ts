@@ -3,6 +3,7 @@ import { ensureSchema, sql } from '../_lib/db.js'
 import { EMAIL_RE, hashPassword, signToken, verifyPassword } from '../_lib/auth.js'
 import { sendVerificationEmail } from '../_lib/email.js'
 import { ensureAccount, loadAccount, loadTxns } from '../_lib/economics.js'
+import { buildUpline, genRefCode, loadReferral, resolveReferrer } from '../_lib/referral.js'
 
 interface UserRow {
   id: number
@@ -52,15 +53,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString()
 
         if (existing.rows.length) {
-          // Unverified account re-signing up — refresh credentials + code.
+          // Unverified account re-signing up — refresh credentials + code, and
+          // backfill a referral code if it somehow has none. Keep any existing
+          // referrer/upline as-is.
           await sql`
-            UPDATE users SET password_hash = ${hash}, verify_code = ${verifyCode}, verify_expires = ${expires}
+            UPDATE users SET
+              password_hash = ${hash},
+              verify_code = ${verifyCode},
+              verify_expires = ${expires},
+              ref_code = COALESCE(ref_code, ${genRefCode()})
             WHERE email = ${email}
           `
         } else {
+          // Capture the referrer (if the signup carried a ?ref code) and store
+          // the new user's own code + upline chain up front.
+          const referrer = await resolveReferrer(body.ref || '')
+          const upline = buildUpline(referrer)
           await sql`
-            INSERT INTO users (email, password_hash, verify_code, verify_expires)
-            VALUES (${email}, ${hash}, ${verifyCode}, ${expires})
+            INSERT INTO users (email, password_hash, verify_code, verify_expires, ref_code, referred_by, upline)
+            VALUES (${email}, ${hash}, ${verifyCode}, ${expires}, ${genRefCode()}, ${referrer ? referrer.id : null}, ${upline}::bigint[])
           `
         }
 
@@ -92,7 +103,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const token = signToken(user.id)
         const account = await loadAccount(user.id)
         const txns = await loadTxns(user.id)
-        return res.status(200).json({ token, account, txns, email: user.email })
+        const referral = await loadReferral(user.id)
+        return res.status(200).json({ token, account, txns, referral, email: user.email })
       }
 
       // ---- RESEND ---------------------------------------------------------
@@ -133,7 +145,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const token = signToken(user.id)
         const account = await loadAccount(user.id)
         const txns = await loadTxns(user.id)
-        return res.status(200).json({ token, account, txns, email: user.email })
+        const referral = await loadReferral(user.id)
+        return res.status(200).json({ token, account, txns, referral, email: user.email })
       }
 
       default:

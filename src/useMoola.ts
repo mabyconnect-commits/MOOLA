@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { faqData, nfts as nftBase, refLevels, refRows, roadmap, type Nft } from './data'
-import { api, clearToken, getToken, setToken, type Account, type ApiTxn } from './api'
+import { api, clearToken, getToken, setToken, type Account, type ApiTxn, type RefRow, type ReferralData } from './api'
 
 export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me'
 export type AuthView = 'welcome' | 'signup' | 'verify' | 'login'
@@ -62,6 +62,9 @@ interface MoolaState {
   showPw: boolean
   joinedTg: boolean
   txns: ApiTxn[]
+  refCode: string
+  refCommissionStr: string
+  refRowsData: RefRow[]
 }
 
 const initialState: MoolaState = {
@@ -116,6 +119,9 @@ const initialState: MoolaState = {
   showPw: false,
   joinedTg: false,
   txns: [],
+  refCode: '',
+  refCommissionStr: '0.000',
+  refRowsData: refRows,
 }
 
 function fmt(n: number, d: number): string {
@@ -198,6 +204,22 @@ export function useMoola() {
     })
   }
 
+  // Merge server referral data (code, total commission, 10-level breakdown).
+  const applyReferral = (r?: ReferralData) => {
+    if (!r) return
+    set({ refCode: r.code, refCommissionStr: r.commissionStr, refRowsData: r.rows })
+  }
+
+  // Capture a ?ref=CODE from the share link so it rides along on signup.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get('ref')
+      if (p) localStorage.setItem('moola_ref', p.trim())
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   // Hydrate from the backend on first mount when a session exists.
   useEffect(() => {
     if (!getToken()) return
@@ -207,6 +229,7 @@ export function useMoola() {
       .then((r) => {
         if (cancelled) return
         applyAccount(r.account, r.txns)
+        applyReferral(r.referral)
         set({ authed: true, screen: 'home', booting: false })
       })
       .catch(() => {
@@ -260,7 +283,13 @@ export function useMoola() {
     if (password !== confirm) return flash('Passwords do not match')
     set({ busy: true })
     try {
-      const r = await api.signup(email, password)
+      let ref = ''
+      try {
+        ref = localStorage.getItem('moola_ref') || ''
+      } catch {
+        /* ignore */
+      }
+      const r = await api.signup(email, password, ref)
       set({ demoCode: r.devCode || '', authView: 'verify', code: '' })
       flash(r.emailed ? '📧 Verification code sent to ' + email : '📧 Use the code shown below')
     } catch (e) {
@@ -279,6 +308,7 @@ export function useMoola() {
       const r = await api.verify(cur.email, cur.code.trim())
       if (r.token) setToken(r.token)
       applyAccount(r.account, r.txns)
+      applyReferral(r.referral)
       set({ authed: true, password: '', confirm: '', code: '', screen: 'home', claim: false, claimStep: 1, booting: false })
     } catch (e) {
       flash(errMsg(e))
@@ -307,6 +337,7 @@ export function useMoola() {
       const r = await api.login(email, password)
       if (r.token) setToken(r.token)
       applyAccount(r.account, r.txns)
+      applyReferral(r.referral)
       set({ authed: true, password: '', screen: 'home', claim: false, booting: false })
     } catch (e) {
       const data = (e as { data?: { needsVerify?: boolean; devCode?: string | null } }).data
@@ -452,6 +483,8 @@ export function useMoola() {
   const solNum = parseFloat(s.solIn) || 0
   const stakeNum = parseFloat(s.stakeAmt) || 0
   const payBal = s.payCcy === 'USDT' ? s.usdt : s.usdc
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.moolas.site'
+  const refLink = s.refCode ? `${origin}/?ref=${s.refCode}` : origin
 
   const faqs = faqData.map((f, i) => ({
     q: f.q,
@@ -462,6 +495,11 @@ export function useMoola() {
   }))
 
   const copyRef = () => {
+    try {
+      navigator.clipboard?.writeText(refLink)
+    } catch {
+      /* ignore */
+    }
     set({ copyLabel: 'Copied!' })
     flash('Referral link copied')
     setTimeout(() => set({ copyLabel: 'Copy' }), 1500)
@@ -513,7 +551,10 @@ export function useMoola() {
     goLogin: () => setAuth('login'),
     goWelcome: () => setAuth('welcome'),
     // data
-    refRows,
+    refRows: s.refRowsData,
+    refLink,
+    refCode: s.refCode,
+    refCommissionStr: s.refCommissionStr,
     roadmap,
     faqs,
     refLevels,
