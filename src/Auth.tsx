@@ -70,6 +70,9 @@ export default function Auth({ v }: { v: MoolaVals }) {
                 <span onClick={v.toggleShowPw} style={css('position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:6px 9px;font-size:17px;cursor:pointer;user-select:none')}>{v.pwEye}</span>
               </div>
 
+              <label style={css('font-size:12px;color:#92b8a3;font-weight:600;letter-spacing:.3px')}>REFERRAL CODE <span style={css('color:#5e7d6a;font-weight:500')}>(optional)</span></label>
+              <input value={v.refInput} onChange={v.onRefInput} placeholder="Enter a friend's code" style={css('width:100%;margin:7px 0 22px;padding:14px 15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(35,211,154,.3);color:#eafff4;font-size:15px;font-family:Sora,sans-serif;outline:none;letter-spacing:1px')} />
+
               <div onClick={v.doSignup} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:700;font-size:15.5px;cursor:pointer;box-shadow:0 8px 24px rgba(35,211,154,.3)')}>Create account</div>
 
               <div style={css('text-align:center;font-size:13.5px;color:#92b8a3;margin-top:20px')}>Already have an account? <span onClick={v.goLogin} style={css('color:#23d39a;font-weight:700;cursor:pointer')}>Log in</span></div>

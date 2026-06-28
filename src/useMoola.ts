@@ -63,6 +63,7 @@ interface MoolaState {
   joinedTg: boolean
   txns: ApiTxn[]
   refCode: string
+  refInput: string
   refCommissionStr: string
   refRowsData: RefRow[]
 }
@@ -120,6 +121,7 @@ const initialState: MoolaState = {
   joinedTg: false,
   txns: [],
   refCode: '',
+  refInput: '',
   refCommissionStr: '0.000',
   refRowsData: refRows,
 }
@@ -167,15 +169,32 @@ function buildOrbs(): Orb[] {
   return orbs
 }
 
+// Read an incoming referral code from ?ref= (or stored from an earlier visit).
+function readIncomingRef(): string {
+  try {
+    const fromUrl = (new URLSearchParams(window.location.search).get('ref') || '').trim().slice(0, 24)
+    return fromUrl || localStorage.getItem('moola_ref') || ''
+  } catch {
+    return ''
+  }
+}
+
 export function useMoola() {
-  const [s, setFull] = useState<MoolaState>(() => ({
-    ...initialState,
-    // If we already hold a session token, boot straight into a loading state
-    // and hydrate from the server rather than flashing the welcome screen.
-    booting: typeof window !== 'undefined' && !!getToken(),
-    // Remember whether the user already joined Telegram (gates the claim).
-    joinedTg: typeof window !== 'undefined' && localStorage.getItem('moola_tg') === '1',
-  }))
+  const [s, setFull] = useState<MoolaState>(() => {
+    const incomingRef = typeof window !== 'undefined' ? readIncomingRef() : ''
+    const hasSession = typeof window !== 'undefined' && !!getToken()
+    return {
+      ...initialState,
+      // If we already hold a session token, boot straight into a loading state
+      // and hydrate from the server rather than flashing the welcome screen.
+      booting: hasSession,
+      // Remember whether the user already joined Telegram (gates the claim).
+      joinedTg: typeof window !== 'undefined' && localStorage.getItem('moola_tg') === '1',
+      // A referral link should drop the visitor on signup with the code filled.
+      refInput: incomingRef,
+      authView: !hasSession && incomingRef ? 'signup' : initialState.authView,
+    }
+  })
   const stateRef = useRef(s)
   stateRef.current = s
   const toastTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -283,9 +302,10 @@ export function useMoola() {
     if (password !== confirm) return flash('Passwords do not match')
     set({ busy: true })
     try {
-      let ref = ''
+      let ref = stateRef.current.refInput.trim()
       try {
-        ref = localStorage.getItem('moola_ref') || ''
+        if (!ref) ref = localStorage.getItem('moola_ref') || ''
+        if (ref) localStorage.setItem('moola_ref', ref)
       } catch {
         /* ignore */
       }
@@ -543,6 +563,9 @@ export function useMoola() {
     onConfirm: onInput('confirm'),
     onCode: (e: ChangeEvent<HTMLInputElement>) =>
       set({ code: e.target.value.replace(/[^0-9]/g, '').slice(0, 6) }),
+    refInput: s.refInput,
+    onRefInput: (e: ChangeEvent<HTMLInputElement>) =>
+      set({ refInput: e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) }),
     doSignup,
     doVerify,
     doLogin,

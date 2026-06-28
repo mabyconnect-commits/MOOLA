@@ -35,7 +35,7 @@ export default function Me({ v }: { v: MoolaVals }) {
         </div>
         <div style={css('font-size:30px;font-weight:800;color:#23d39a')}>0.00 <span style={css('font-size:14px;color:#92b8a3;font-weight:600')}>$MOOLA</span></div>
         <div style={css('display:flex;align-items:center;gap:8px;padding:5px 5px 5px 14px;border-radius:22px;background:rgba(8,16,38,.45);border:1px solid rgba(110,200,150,.18);margin-top:14px')}>
-          <span style={css('flex:1;text-align:left;font-size:13px;color:#cfe7da;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>moola.app?rid=2103788</span>
+          <span style={css('flex:1;text-align:left;font-size:13px;color:#cfe7da;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{v.refLink}</span>
           <div onClick={v.copyRef} style={css('padding:8px 18px;border-radius:18px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:700;font-size:13px;cursor:pointer')}>{v.copyLabel}</div>
         </div>
       </div>
