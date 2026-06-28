@@ -48,13 +48,53 @@ src/
 public/assets/       Mascot, NFT artwork, deposit QR
 ```
 
-## Notes for production
+## Backend
 
-This is a faithful UI build with simulated state. Before shipping:
+The app is backed by **Vercel Serverless Functions** (`/api`) + **Vercel
+Postgres (Neon)**. Everything deploys as a single Vercel project — no separate
+server to run.
 
-- **Auth** — replace the demo 6-digit code flow with a real provider
-  (email/password + verification email or magic link, session persistence).
-  Remove the on-screen "Demo code" banner.
-- **Wallet & chain** — wire real Solana wallet connection, presale purchase,
-  staking, NFT minting, and sell flows to the contracts/backend.
-- The economic numbers (rewards, balances, prices) are illustrative.
+```
+api/
+  _lib/
+    db.ts          Postgres pool + auto-creating schema (users, accounts, transactions)
+    auth.ts        password hashing (bcrypt), JWT sessions, request auth
+    email.ts       Resend verification email (with graceful fallback)
+    economics.ts   account loading, server-side reward accrual, history
+  auth/[action].ts signup · verify · resend · login
+  account.ts       GET — hydrate the signed-in user's balances + history
+  action/[type].ts stake · claim-airdrop · claim-rewards · compound · buy · deposit · sell · mint
+```
+
+What's real now:
+
+- **Auth** — real accounts with bcrypt-hashed passwords, email verification
+  codes (15-min expiry), and 30-day JWT sessions persisted in `localStorage`.
+  Verification emails send via Resend; if no API key is set the code is shown
+  on-screen so the flow still works.
+- **Persistence** — every balance, stake, reward, claim, deposit and mint is
+  stored per-user in Postgres and survives reloads and devices. Staking
+  rewards accrue **server-side** based on elapsed time.
+- **Empty wallet until claim** — new accounts start at 0 across the board. The
+  one-time airdrop claim (200 $MOOLA, recorded against the user's Solana
+  address) is the first thing that funds the wallet.
+
+What's intentionally **not** on-chain yet: the economic amounts are
+app-managed numbers, and deposits/sells/presale buys are recorded but do **not**
+move real crypto. Wiring real Solana settlement (SPL token, staking program,
+custody) is a separate, audited piece of work — don't take real user funds
+against these flows until that's built.
+
+### Deploy to Vercel
+
+1. Import the repo into Vercel.
+2. **Storage → Create Database → Postgres (Neon)** and connect it to the
+   project. This sets `POSTGRES_URL` automatically. Tables auto-create on the
+   first request.
+3. **Settings → Environment Variables** — add `JWT_SECRET`
+   (`openssl rand -base64 48`). Optionally add `RESEND_API_KEY` +
+   `MOOLA_EMAIL_FROM` to send real verification emails.
+4. Deploy. See `.env.example` for the full list.
+
+Local full-stack dev: `npm run dev:full` (runs `vercel dev`, serving the SPA
+and `/api` together). `npm run dev` runs the UI only (no backend).

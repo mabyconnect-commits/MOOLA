@@ -75,7 +75,9 @@ export default function Auth({ v }: { v: MoolaVals }) {
             <div style={css('animation:riseIn .4s ease')}>
               <div style={css('font-size:21px;font-weight:700;margin-bottom:4px')}>Verify your email</div>
               <div style={css('font-size:13.5px;color:#92b8a3;margin-bottom:10px;line-height:1.5')}>We sent a 6-digit code to <b style={css('color:#eafff4')}>{v.email}</b>. Enter it below to activate your account.</div>
-              <div style={css('font-size:12.5px;color:#f2b34e;background:rgba(242,179,78,.12);border:1px solid rgba(242,179,78,.3);border-radius:12px;padding:10px 13px;margin-bottom:20px')}>Demo code: <b style={css('letter-spacing:2px')}>{v.demoCode}</b></div>
+              {v.demoCode && (
+                <div style={css('font-size:12.5px;color:#f2b34e;background:rgba(242,179,78,.12);border:1px solid rgba(242,179,78,.3);border-radius:12px;padding:10px 13px;margin-bottom:20px')}>Email isn't configured yet — use code: <b style={css('letter-spacing:2px')}>{v.demoCode}</b></div>
+              )}
 
               <label style={css('font-size:12px;color:#92b8a3;font-weight:600;letter-spacing:.3px')}>VERIFICATION CODE</label>
               <input value={v.code} onChange={v.onCode} inputMode="numeric" maxLength={6} placeholder="••••••" style={css('width:100%;margin:7px 0 22px;padding:15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:24px;font-weight:700;letter-spacing:10px;text-align:center;font-family:Sora,sans-serif;outline:none')} />
