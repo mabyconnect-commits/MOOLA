@@ -269,7 +269,17 @@ export function useMoola() {
         applyAccount(r.account, r.txns)
         applyReferral(r.referral)
         applyStats(r.stats)
-        set({ authed: true, screen: 'home', booting: false })
+        // On refresh, stay on whatever tab the user was viewing.
+        let restored: Screen = 'home'
+        try {
+          const saved = localStorage.getItem('moola_screen')
+          if (saved && ['home', 'stake', 'presale', 'nft', 'me'].includes(saved)) {
+            restored = saved as Screen
+          }
+        } catch {
+          /* ignore */
+        }
+        set({ authed: true, screen: restored, booting: false })
         // Warm the deterministic deposit address in the background so the
         // deposit sheet opens instantly (and never re-generates it).
         api
@@ -310,8 +320,20 @@ export function useMoola() {
     toastTimer.current = setTimeout(() => set({ toast: '' }), 1900)
   }
 
-  const go = (screen: Screen) =>
+  // Remember the active tab so a page refresh stays put instead of bouncing
+  // back to Home.
+  const persistScreen = (screen: Screen) => {
+    try {
+      localStorage.setItem('moola_screen', screen)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const go = (screen: Screen) => {
+    persistScreen(screen)
     set({ screen, wallet: false, claim: false, stakeForm: false, rewards: false, details: false })
+  }
 
   const cdString = () => {
     const t = Math.max(0, Math.floor(s.cd))
@@ -360,6 +382,7 @@ export function useMoola() {
       applyAccount(r.account, r.txns)
       applyReferral(r.referral)
       applyStats(r.stats)
+      persistScreen('home')
       set({ authed: true, password: '', confirm: '', code: '', screen: 'home', claim: false, claimStep: 1, booting: false })
     } catch (e) {
       flash(errMsg(e))
@@ -390,6 +413,7 @@ export function useMoola() {
       applyAccount(r.account, r.txns)
       applyReferral(r.referral)
       applyStats(r.stats)
+      persistScreen('home')
       set({ authed: true, password: '', screen: 'home', claim: false, booting: false })
     } catch (e) {
       const data = (e as { data?: { needsVerify?: boolean; devCode?: string | null } }).data
