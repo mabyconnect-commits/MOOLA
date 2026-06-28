@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ensureSchema } from '../_lib/db.js'
 import { SOLANA_ADDR_RE, userIdFromReq } from '../_lib/auth.js'
+import { distributeCommission } from '../_lib/referral.js'
 import {
   AIRDROP_AMOUNT,
   PRESALE_PRICE,
@@ -111,6 +112,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.available += tokens
         await saveAccount(userId, a)
         await addTxn(userId, { icon: '🛒', title: 'Presale buy', sub: `${fmt(amt, 2)} ${ccy}`, amt: `+${fmt(tokens, 0)} $MOOLA`, pos: true })
+        // Pay 10-level referral commission on the purchased tokens.
+        await distributeCommission(userId, tokens)
         break
       }
 
