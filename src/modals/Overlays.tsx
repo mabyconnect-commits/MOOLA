@@ -25,6 +25,20 @@ export default function Overlays({ v }: { v: MoolaVals }) {
                 <div style={css('font-size:12px;color:#92b8a3')}>Staked</div><div style={css('font-size:17px;font-weight:700;color:#23d39a')}>{v.stakedStr}</div>
               </div>
             </div>
+            {/* spendable assets on Solana: SOL (fees) + USDT (buy presale) */}
+            <div style={css('font-size:13px;color:#92b8a3;margin-bottom:9px')}>Your assets</div>
+            <div style={css('display:flex;flex-direction:column;gap:9px;margin-bottom:18px')}>
+              <div style={css('display:flex;align-items:center;gap:11px;padding:12px 13px;border-radius:13px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.16)')}>
+                <div style={css('width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#9945ff,#14f195);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff')}>◎</div>
+                <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>{v.solStr} SOL</div><div style={css('font-size:11.5px;color:#92b8a3')}>Solana · for network fees</div></div>
+                <div onClick={() => v.openDeposit('SOL')} style={css('padding:7px 16px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Deposit</div>
+              </div>
+              <div style={css('display:flex;align-items:center;gap:11px;padding:12px 13px;border-radius:13px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.16)')}>
+                <div style={css('width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#26a17b,#2fd6a6);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff')}>₮</div>
+                <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>{v.usdtBalStr} USDT</div><div style={css('font-size:11.5px;color:#92b8a3')}>Solana (SPL) · buy presale</div></div>
+                <div onClick={() => v.openDeposit('USDT')} style={css('padding:7px 16px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Deposit</div>
+              </div>
+            </div>
             <div style={css('display:flex;gap:11px;margin-bottom:18px')}>
               <div onClick={v.goPresale} style={css('flex:1;text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;cursor:pointer')}>↓ Buy</div>
               <div onClick={v.openSell} style={css('flex:1;text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#f2b34e,#ff9d3c);color:#2a1a06;font-weight:800;cursor:pointer')}>↑ Sell</div>
@@ -139,19 +153,25 @@ export default function Overlays({ v }: { v: MoolaVals }) {
         </div>
       )}
 
-      {/* ===== DEPOSIT / PAY PRESALE ===== */}
+      {/* ===== DEPOSIT (SOL or USDT on Solana / SPL) ===== */}
       {v.deposit && (
         <div style={css('position:fixed;inset:0;z-index:58;background:#06110b;display:flex;justify-content:center;overflow-y:auto')}>
           <div style={css('width:440px;max-width:100vw;min-height:100%;padding:18px 18px 40px;background:radial-gradient(130% 70% at 50% -5%, #123a2a 0%, #0a1d14 45%, #06110b 100%)')}>
             <div style={css('display:flex;align-items:center;gap:12px;margin-bottom:22px')}>
               <div onClick={v.closeDeposit} style={css('width:36px;height:36px;border-radius:50%;background:rgba(15,40,28,.7);border:1px solid rgba(110,200,150,.2);display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer')}>‹</div>
-              <span style={css('font-size:19px;font-weight:800')}>Deposit to buy</span>
+              <span style={css('font-size:19px;font-weight:800')}>Deposit {v.depositAsset}</span>
             </div>
 
-            <div style={css('border-radius:18px;background:linear-gradient(150deg,rgba(47,227,194,.14),rgba(242,179,78,.12));border:1px solid rgba(110,200,150,.22);padding:18px;text-align:center;margin-bottom:18px')}>
-              <div style={css('font-size:12.5px;color:#bfe3d0;letter-spacing:.3px')}>SEND EXACTLY</div>
-              <div style={css('font-size:34px;font-weight:800;letter-spacing:-.5px;margin:3px 0')}>{v.depSolStr} <span style={css('font-size:18px;color:#9fefc6')}>SOL</span></div>
-              <div style={css('font-size:13px;color:#92b8a3')}>≈ ${v.depUsdStr} · you receive <b style={css('color:#23d39a')}>{v.depTokensStr} $MOOLA</b></div>
+            {/* amount being deposited */}
+            <div style={css('border-radius:18px;background:linear-gradient(150deg,rgba(47,227,194,.14),rgba(242,179,78,.12));border:1px solid rgba(110,200,150,.22);padding:18px;margin-bottom:18px')}>
+              <div style={css('font-size:12.5px;color:#bfe3d0;letter-spacing:.3px;text-align:center;margin-bottom:10px')}>AMOUNT YOU'RE SENDING</div>
+              <div style={css('display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:13px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.2)')}>
+                <input value={v.depositAmt} onChange={v.onDepositAmt} inputMode="decimal" placeholder="0.0" style={css("flex:1;background:transparent;border:none;outline:none;color:#eafff4;font-size:24px;font-weight:800;font-family:'Sora',sans-serif;width:100%")} />
+                <span style={css('font-weight:700;color:#9fefc6;font-size:16px')}>{v.depositAsset}</span>
+              </div>
+              {v.depTokensStr && (
+                <div style={css('font-size:12.5px;color:#92b8a3;text-align:center;margin-top:10px')}>Covers a presale buy of <b style={css('color:#23d39a')}>{v.depTokensStr} $MOOLA</b></div>
+              )}
             </div>
 
             <div style={css('display:flex;justify-content:center;margin-bottom:18px')}>
@@ -163,19 +183,19 @@ export default function Overlays({ v }: { v: MoolaVals }) {
             <div style={css('display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;background:rgba(15,40,28,.6);border:1px solid rgba(110,200,150,.16);margin-bottom:11px')}>
               <div style={css('width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#9945ff,#14f195);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff')}>◎</div>
               <div style={css('flex:1')}><div style={css('font-size:11.5px;color:#92b8a3')}>Network</div><div style={css('font-size:14.5px;font-weight:700')}>Solana (SPL)</div></div>
-              <div style={css('font-size:11px;color:#f2b34e;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(242,179,78,.14)')}>SOL only</div>
+              <div style={css('font-size:11px;color:#f2b34e;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(242,179,78,.14)')}>{v.depositAsset} only</div>
             </div>
 
-            <div style={css('font-size:12.5px;color:#92b8a3;margin:6px 2px 7px')}>Moola deposit address</div>
+            <div style={css('font-size:12.5px;color:#92b8a3;margin:6px 2px 7px')}>Your Moola {v.depositAsset} deposit address</div>
             <div style={css('display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:14px;background:rgba(6,22,14,.6);border:1px solid rgba(110,200,150,.2);margin-bottom:18px')}>
-              <span style={css('flex:1;font-size:13px;color:#cfe7da;word-break:break-all;line-height:1.4')}>So1aMooLaPreSa1e9xKqTbD7vRt4Z8aE2nWyMoo9aE2</span>
+              <span style={css('flex:1;font-size:13px;color:#cfe7da;word-break:break-all;line-height:1.4')}>{v.depAddr}</span>
               <div onClick={v.copyDepAddr} style={css('flex-shrink:0;padding:9px 16px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:700;font-size:13px;cursor:pointer')}>{v.depCopyLabel}</div>
             </div>
 
             <div style={css('border-radius:14px;background:rgba(15,40,28,.5);border:1px solid rgba(110,200,150,.14);padding:15px 16px;margin-bottom:18px')}>
-              <div style={css('display:flex;gap:10px;align-items:flex-start;margin-bottom:11px')}><span style={css('color:#23d39a;font-weight:800')}>1.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Send the exact SOL amount above to the address — from any Solana wallet or exchange.</span></div>
-              <div style={css('display:flex;gap:10px;align-items:flex-start;margin-bottom:11px')}><span style={css('color:#23d39a;font-weight:800')}>2.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Your $MOOLA is credited and auto-staked once 1 network confirmation lands (~30s).</span></div>
-              <div style={css('display:flex;gap:10px;align-items:flex-start')}><span style={css('color:#23d39a;font-weight:800')}>3.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Tap below after you've sent the payment to track it.</span></div>
+              <div style={css('display:flex;gap:10px;align-items:flex-start;margin-bottom:11px')}><span style={css('color:#23d39a;font-weight:800')}>1.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Send {v.depositAsset} on the <b style={css('color:#eafff4')}>Solana (SPL)</b> network to the address above — from any Solana wallet or exchange.</span></div>
+              <div style={css('display:flex;gap:10px;align-items:flex-start;margin-bottom:11px')}><span style={css('color:#23d39a;font-weight:800')}>2.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Enter the amount you sent above, then tap confirm.</span></div>
+              <div style={css('display:flex;gap:10px;align-items:flex-start')}><span style={css('color:#23d39a;font-weight:800')}>3.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Your {v.depositAsset} balance updates and is ready to use.</span></div>
             </div>
 
             <div style={css('display:flex;align-items:center;gap:8px;justify-content:center;font-size:12px;color:#7ea98f;margin-bottom:14px')}>

@@ -18,6 +18,8 @@ interface MoolaState {
   available: number
   airdrop: number
   balance: number
+  sol: number
+  usdt: number
   cd: number
   copyLabel: string
   toast: string
@@ -28,7 +30,8 @@ interface MoolaState {
   claimAddr: string
   faqOpen: number
   deposit: boolean
-  depositSol: number
+  depositAsset: 'SOL' | 'USDT'
+  depositAmt: string
   depCopied: boolean
   sell: boolean
   sellAmt: string
@@ -59,6 +62,8 @@ const initialState: MoolaState = {
   available: 30,
   airdrop: 0,
   balance: 530,
+  sol: 0,
+  usdt: 0,
   cd: 12 * 3600 + 24 * 60 + 6,
   copyLabel: 'Copy',
   toast: '',
@@ -69,7 +74,8 @@ const initialState: MoolaState = {
   claimAddr: '',
   faqOpen: 0,
   deposit: false,
-  depositSol: 0,
+  depositAsset: 'USDT',
+  depositAmt: '',
   depCopied: false,
   sell: false,
   sellAmt: '',
@@ -253,25 +259,44 @@ export function useMoola() {
     set((p) => ({ staked: p.staked + r, balance: p.balance + r, reward: 0, rewards: false }))
     flash('🔁 Compounded ' + fmt(r, 4) + ' $MOOLA into your stake')
   }
+  // Presale is paid in USDT (Solana / SPL). If the user already has enough
+  // USDT deposited, buy immediately; otherwise route them to deposit USDT.
   const doBuy = () => {
-    const sol = parseFloat(stateRef.current.solIn)
-    if (!sol || sol <= 0) {
-      flash('Enter SOL amount')
+    const amt = parseFloat(stateRef.current.solIn)
+    if (!amt || amt <= 0) {
+      flash('Enter a USDT amount')
       return
     }
-    set({ deposit: true, depositSol: sol })
+    if (stateRef.current.usdt >= amt) {
+      const tokens = Math.floor(amt / 0.01) // $0.01 per $MOOLA, USDT ≈ $1
+      set((p) => ({
+        usdt: p.usdt - amt,
+        balance: p.balance + tokens,
+        available: p.available + tokens,
+        solIn: '',
+      }))
+      flash('✅ Bought ' + fmt(tokens, 0) + ' $MOOLA with ' + fmt(amt, 2) + ' USDT')
+    } else {
+      const needed = amt - stateRef.current.usdt
+      set({ deposit: true, depositAsset: 'USDT', depositAmt: needed.toFixed(2) })
+      flash('Deposit USDT on Solana to continue')
+    }
   }
+  const openDeposit = (asset: 'SOL' | 'USDT') =>
+    set({ deposit: true, depositAsset: asset, depositAmt: '', wallet: false })
   const confirmDeposit = () => {
-    const sol = stateRef.current.depositSol
-    const tokens = Math.floor((sol * 152) / 0.01)
-    set((p) => ({
-      balance: p.balance + tokens,
-      available: p.available + tokens,
-      buySuccess: tokens,
-      solIn: '',
-      deposit: false,
-    }))
-    flash('✅ Payment confirmed — ' + fmt(tokens, 0) + ' $MOOLA staked!')
+    const amt = parseFloat(stateRef.current.depositAmt) || 0
+    if (amt <= 0) {
+      flash('Enter the amount you sent')
+      return
+    }
+    const asset = stateRef.current.depositAsset
+    set((p) =>
+      asset === 'SOL'
+        ? { sol: p.sol + amt, deposit: false, depositAmt: '' }
+        : { usdt: p.usdt + amt, deposit: false, depositAmt: '' },
+    )
+    flash('✅ ' + fmt(amt, asset === 'SOL' ? 4 : 2) + ' ' + asset + ' credited to your wallet')
   }
   const doMint = (n: Nft) => {
     const price = parseFloat(String(n.price).replace(/,/g, ''))
@@ -293,7 +318,7 @@ export function useMoola() {
       return
     }
     const sol = (amt * 0.01) / 152
-    set((p) => ({ available: p.available - amt, balance: p.balance - amt, sell: false, sellAmt: '' }))
+    set((p) => ({ available: p.available - amt, balance: p.balance - amt, sol: p.sol + sol, sell: false, sellAmt: '' }))
     flash('✅ Sold ' + fmt(amt, 0) + ' $MOOLA → ' + sol.toFixed(4) + ' SOL')
   }
   const claimAirdrop = () => set({ claimStep: 2 })
@@ -390,6 +415,8 @@ export function useMoola() {
     availStr: fmt(s.available, 3),
     airdropBalStr: fmt(s.airdrop, 0),
     usdtStr: fmt(s.balance * 0.01, 2),
+    solStr: fmt(s.sol, 4),
+    usdtBalStr: fmt(s.usdt, 2),
     rewardStr: fmt(s.reward, 6),
     cdStr: cdString(),
     dailyRewardsStr: fmt(s.staked * 0.0205, 3),
@@ -403,7 +430,11 @@ export function useMoola() {
     // presale / stake form inputs
     solIn: s.solIn,
     stakeAmt: s.stakeAmt,
-    buyTokens: solNum > 0 ? fmt(Math.floor((solNum * 152) / 0.01), 0) : '0',
+    buyTokens: solNum > 0 ? fmt(Math.floor(solNum / 0.01), 0) : '0',
+    // presale pays in USDT: if the user already holds enough USDT they can buy
+    // straight away, otherwise the CTA sends them to deposit USDT first.
+    buyNeedsDeposit: solNum > 0 && s.usdt < solNum,
+    buyCtaLabel: solNum > 0 && s.usdt < solNum ? 'Deposit USDT to continue' : 'Buy $MOOLA',
     stakeEstTotal: stakeNum > 0 ? fmt(stakeNum * 0.0205 * 20, 3) : '0.000',
     stakeEstDaily: stakeNum > 0 ? fmt(stakeNum * 0.0205, 3) : '0.000',
     claimAddr: s.claimAddr,
@@ -435,12 +466,18 @@ export function useMoola() {
     onClaimAddr: onInput('claimAddr'),
     doStake,
     doBuy,
-    // deposit
+    // deposit (asset top-up: SOL or USDT on Solana SPL)
     deposit: s.deposit,
-    depSolStr: fmt(s.depositSol || 0, 3),
-    depTokensStr: fmt(Math.floor(((s.depositSol || 0) * 152) / 0.01), 0),
-    depUsdStr: fmt((s.depositSol || 0) * 152, 2),
+    depositAsset: s.depositAsset,
+    depositAmt: s.depositAmt,
+    depAddr: 'So1aMooLaPreSa1e9xKqTbD7vRt4Z8aE2nWyMoo9aE2',
+    depTokensStr:
+      s.depositAsset === 'USDT' && parseFloat(s.depositAmt) > 0
+        ? fmt(Math.floor(parseFloat(s.depositAmt) / 0.01), 0)
+        : '',
     depCopyLabel: s.depCopied ? 'Copied!' : 'Copy',
+    onDepositAmt: onInput('depositAmt'),
+    openDeposit,
     closeDeposit: () => set({ deposit: false }),
     confirmDeposit,
     copyDepAddr: () => {
