@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sql } from './_lib/db'
+import { sql } from './_lib/db.js'
 
 // Diagnostic endpoint — open https://<your-domain>/api/health in a browser.
 // Reports which env vars are present (booleans only, never the values) and

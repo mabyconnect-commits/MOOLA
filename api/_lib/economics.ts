@@ -1,4 +1,4 @@
-import { sql } from './db'
+import { sql } from './db.js'
 
 // ---------------------------------------------------------------------------
 // Economic constants — kept in one place and mirrored by the frontend.
