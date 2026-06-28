@@ -206,8 +206,8 @@ export function useMoola() {
       flash('Incorrect code — try again')
       return
     }
-    // Verified → land straight on the Claim Airdrop, no welcome toast.
-    set({ authed: true, password: '', confirm: '', code: '', screen: 'home', claim: true, claimStep: 1 })
+    // Verified → land on the Home page (Claim is one tap away via the banner).
+    set({ authed: true, password: '', confirm: '', code: '', screen: 'home', claim: false, claimStep: 1 })
   }
   const resendCode = () => {
     set({ demoCode: genCode() })
@@ -223,8 +223,8 @@ export function useMoola() {
       flash('Enter your password')
       return
     }
-    // Signed in → land straight on the Claim Airdrop, no welcome toast.
-    set({ authed: true, password: '', screen: 'home', claim: true, claimStep: 1 })
+    // Signed in → land on the Home page (Claim is one tap away via the banner).
+    set({ authed: true, password: '', screen: 'home', claim: false })
   }
 
   // ---- economic actions ----

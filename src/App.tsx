@@ -19,21 +19,23 @@ export default function App() {
         <div style={css('position:absolute;top:-60px;left:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,#23d39a 0%,transparent 70%);opacity:.16;pointer-events:none')}></div>
         <div style={css('position:absolute;top:120px;right:-110px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,#f2b34e 0%,transparent 70%);opacity:.18;pointer-events:none')}></div>
 
-        {/* primary screens */}
-        {v.isHome && <Home v={v} />}
-        {v.isStake && <Stake v={v} />}
-        {v.isPresale && <Presale v={v} />}
-        {v.isNft && <Nft v={v} />}
-        {v.isMe && <Me v={v} />}
+        {/* app shell — only mounted once signed in, so the auth gate isn't
+            stretched by the (long) screens rendered behind it */}
+        {!v.showAuth && (
+          <>
+            {v.isHome && <Home v={v} />}
+            {v.isStake && <Stake v={v} />}
+            {v.isPresale && <Presale v={v} />}
+            {v.isNft && <Nft v={v} />}
+            {v.isMe && <Me v={v} />}
 
-        {/* overlays + toast */}
-        <Overlays v={v} />
+            <Overlays v={v} />
+            <BottomNav v={v} />
+          </>
+        )}
 
         {/* auth gate (covers everything until authed) */}
         {v.showAuth && <Auth v={v} />}
-
-        {/* bottom nav */}
-        <BottomNav v={v} />
       </div>
     </div>
   )
