@@ -79,11 +79,11 @@ export default function Home({ v }: { v: MoolaVals }) {
       {/* live stats strip */}
       <div style={css('display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:34px')}>
         <div style={css('border-radius:16px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);padding:15px 8px;text-align:center')}>
-          <div style={css('font-size:20px;font-weight:800;color:#23d39a')}>$23K</div>
+          <div style={css('font-size:20px;font-weight:800;color:#23d39a')}>{v.raisedStr}</div>
           <div style={css('font-size:11px;color:#92b8a3;margin-top:3px')}>Raised</div>
         </div>
         <div style={css('border-radius:16px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);padding:15px 8px;text-align:center')}>
-          <div style={css('font-size:20px;font-weight:800;color:#f2b34e')}>1,300</div>
+          <div style={css('font-size:20px;font-weight:800;color:#f2b34e')}>{v.holdersStr}</div>
           <div style={css('font-size:11px;color:#92b8a3;margin-top:3px')}>Holders</div>
         </div>
         <div style={css('border-radius:16px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);padding:15px 8px;text-align:center')}>
@@ -102,11 +102,11 @@ export default function Home({ v }: { v: MoolaVals }) {
           <span style={css('font-size:13px;font-weight:700;color:#f2b34e')}>$0.01</span>
         </div>
         <div style={css('height:12px;border-radius:8px;background:rgba(6,22,14,.6);overflow:hidden;margin-bottom:9px')}>
-          <div style={css('width:3%;height:100%;border-radius:8px;background:linear-gradient(90deg,#23d39a,#f2b34e);box-shadow:0 0 14px rgba(35,211,154,.5)')}></div>
+          <div style={css('width:' + v.soldBarWidth + ';height:100%;border-radius:8px;background:linear-gradient(90deg,#23d39a,#f2b34e);box-shadow:0 0 14px rgba(35,211,154,.5)')}></div>
         </div>
         <div style={css('display:flex;justify-content:space-between;font-size:12px;color:#92b8a3')}>
-          <span><b style={css('color:#cfe7da')}>2,300,000</b> sold</span>
-          <span>of 700,000,000</span>
+          <span><b style={css('color:#cfe7da')}>{v.soldStr}</b> sold</span>
+          <span>of {v.totalStr}</span>
         </div>
       </div>
 

@@ -38,6 +38,14 @@ export interface Account {
   minted: number
   airdropClaimed: boolean
   claimAddr: string | null
+  stakedAt: number | null
+}
+
+export interface Stats {
+  raised: number
+  holders: number
+  sold: number
+  total: number
 }
 
 export interface ApiTxn {
@@ -71,6 +79,7 @@ export interface AccountResponse {
   depositAmt?: string
   address?: string
   found?: boolean
+  stats?: Stats
 }
 
 export interface AuthChallenge {

@@ -198,9 +198,9 @@ export default function Overlays({ v }: { v: MoolaVals }) {
 
             {/* lock progress */}
             <div style={css('border-radius:14px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.14);padding:14px 16px;margin-bottom:16px')}>
-              <div style={css('display:flex;justify-content:space-between;font-size:12.5px;color:#92b8a3;margin-bottom:9px')}><span>Lock progress · Day 4 of 20</span><span style={css('color:#cfe7da;font-weight:700')}>~16 days left</span></div>
+              <div style={css('display:flex;justify-content:space-between;font-size:12.5px;color:#92b8a3;margin-bottom:9px')}><span>Lock progress · {v.lockDayStr}</span><span style={css('color:#cfe7da;font-weight:700')}>{v.lockLeftStr}</span></div>
               <div style={css('height:10px;border-radius:6px;background:rgba(6,22,14,.7);overflow:hidden')}>
-                <div style={css('width:20%;height:100%;border-radius:6px;background:linear-gradient(90deg,#23d39a,#f2b34e);box-shadow:0 0 12px rgba(35,211,154,.5)')}></div>
+                <div style={css('width:' + v.lockBarWidth + ';height:100%;border-radius:6px;background:linear-gradient(90deg,#23d39a,#f2b34e);box-shadow:0 0 12px rgba(35,211,154,.5)')}></div>
               </div>
             </div>
 

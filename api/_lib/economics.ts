@@ -22,6 +22,7 @@ export interface Account {
   minted: number
   airdropClaimed: boolean
   claimAddr: string | null
+  stakedAt: number | null // ms timestamp of the first stake (lock start)
 }
 
 export interface Txn {
@@ -45,6 +46,7 @@ interface AccountRow {
   airdrop_claimed: boolean
   claim_addr: string | null
   reward_updated_at: string
+  staked_at: string | null
 }
 
 function fmt(n: number, d: number): string {
@@ -66,6 +68,7 @@ export async function loadAccount(userId: number): Promise<Account> {
     return {
       balance: 0, staked: 0, available: 0, reward: 0, airdrop: 0,
       sol: 0, usdt: 0, usdc: 0, minted: 0, airdropClaimed: false, claimAddr: null,
+      stakedAt: null,
     }
   }
   const r = rows[0]
@@ -90,6 +93,7 @@ export async function loadAccount(userId: number): Promise<Account> {
     minted: r.minted,
     airdropClaimed: r.airdrop_claimed,
     claimAddr: r.claim_addr,
+    stakedAt: r.staked_at ? new Date(r.staked_at).getTime() : null,
   }
 }
 
@@ -129,6 +133,43 @@ export async function loadTxns(userId: number): Promise<Txn[]> {
     LIMIT 50
   `
   return rows.map((r) => ({ icon: r.icon, title: r.title, sub: r.sub, amt: r.amt, pos: r.pos }))
+}
+
+// ---------------------------------------------------------------------------
+// Launch stats — real aggregates plus a marketing baseline so the numbers look
+// alive at launch and grow with genuine activity.
+// ---------------------------------------------------------------------------
+export const PRESALE_TOTAL = 700_000_000
+export const BASE_SOLD = 2_300_000
+export const BASE_RAISED = 23_000
+export const BASE_HOLDERS = 1_300
+
+export interface Stats {
+  raised: number
+  holders: number
+  sold: number
+  total: number
+}
+
+/** Increment the global presale counters when someone buys. */
+export async function addPresale(tokens: number, usd: number): Promise<void> {
+  await sql`INSERT INTO app_meta (key, val) VALUES ('presale_sold', ${String(tokens)})
+    ON CONFLICT (key) DO UPDATE SET val = (COALESCE(app_meta.val::numeric, 0) + ${tokens})::text`
+  await sql`INSERT INTO app_meta (key, val) VALUES ('presale_raised', ${String(usd)})
+    ON CONFLICT (key) DO UPDATE SET val = (COALESCE(app_meta.val::numeric, 0) + ${usd})::text`
+}
+
+/** Live launch stats: baseline + real presale activity + real holder count. */
+export async function loadStats(): Promise<Stats> {
+  const sold = await sql<{ val: string }>`SELECT val FROM app_meta WHERE key = 'presale_sold'`
+  const raised = await sql<{ val: string }>`SELECT val FROM app_meta WHERE key = 'presale_raised'`
+  const holders = await sql<{ c: number }>`SELECT COUNT(*)::int AS c FROM accounts WHERE balance + staked > 0`
+  return {
+    raised: BASE_RAISED + Number(raised.rows[0]?.val || 0),
+    holders: BASE_HOLDERS + Number(holders.rows[0]?.c || 0),
+    sold: BASE_SOLD + Number(sold.rows[0]?.val || 0),
+    total: PRESALE_TOTAL,
+  }
 }
 
 export { fmt }

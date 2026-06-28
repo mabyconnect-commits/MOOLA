@@ -91,6 +91,78 @@ export async function readBalances(index: number): Promise<{ sol: number; usdt: 
   return { sol: lamports / LAMPORTS, usdt, usdc }
 }
 
+/**
+ * Sweep everything sitting in a user's deposit address into the treasury.
+ *
+ * The treasury is set as the fee payer on every transaction, so a deposit
+ * address never needs SOL of its own to forward its SPL tokens — it only signs
+ * to authorise moving its funds. Token accounts are closed after transfer so
+ * their rent flows to the treasury too. SOL is swept last (the whole balance,
+ * since the treasury covers the fee). Returns the confirmed signatures.
+ */
+export async function sweepToTreasury(index: number): Promise<string[]> {
+  if (!payoutConfigured()) throw new Error('Sweep requires TREASURY_ADDRESS + TREASURY_SECRET')
+  const conn = connection()
+  const treasury = await treasuryKeypair()
+  const dep = depositKeypair(index)
+  const sigs: string[] = []
+
+  // ---- SPL tokens (USDT, USDC) ----
+  const {
+    getAssociatedTokenAddress,
+    getAccount,
+    createTransferCheckedInstruction,
+    createCloseAccountInstruction,
+    createAssociatedTokenAccountInstruction,
+  } = await import('@solana/spl-token')
+
+  for (const asset of ['USDT', 'USDC'] as const) {
+    try {
+      const mint = mintFor(asset)
+      const fromAta = await getAssociatedTokenAddress(mint, dep.publicKey)
+      let raw: bigint
+      try {
+        raw = (await getAccount(conn, fromAta)).amount
+      } catch {
+        continue // no token account / nothing here
+      }
+      if (raw <= 0n) continue
+
+      const toAta = await getAssociatedTokenAddress(mint, treasury.publicKey)
+      const tx = new Transaction()
+      // Make sure the treasury's receiving account exists (treasury funds it).
+      if (!(await conn.getAccountInfo(toAta))) {
+        tx.add(createAssociatedTokenAccountInstruction(treasury.publicKey, toAta, treasury.publicKey, mint))
+      }
+      tx.add(createTransferCheckedInstruction(fromAta, mint, toAta, dep.publicKey, raw, TOKEN_DECIMALS))
+      // Close the now-empty deposit token account, returning its rent SOL.
+      tx.add(createCloseAccountInstruction(fromAta, treasury.publicKey, dep.publicKey))
+      tx.feePayer = treasury.publicKey
+      sigs.push(await sendAndConfirmTransaction(conn, tx, [treasury, dep]))
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(`[moola] ${asset} sweep failed for index ${index}:`, e)
+    }
+  }
+
+  // ---- SOL (whole balance; treasury pays the fee) ----
+  try {
+    const lamports = await conn.getBalance(dep.publicKey)
+    if (lamports > 0) {
+      const tx = new Transaction().add(
+        SystemProgram.transfer({ fromPubkey: dep.publicKey, toPubkey: treasury.publicKey, lamports }),
+      )
+      tx.feePayer = treasury.publicKey
+      sigs.push(await sendAndConfirmTransaction(conn, tx, [treasury, dep]))
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error(`[moola] SOL sweep failed for index ${index}:`, e)
+  }
+
+  return sigs
+}
+
 /** Pay a user out from the treasury (used by withdrawals). Returns the tx sig. */
 export async function payout(to: string, asset: Asset, amount: number): Promise<string> {
   const conn = connection()

@@ -120,6 +120,11 @@ export function ensureSchema(): Promise<void> {
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_usdt DOUBLE PRECISION NOT NULL DEFAULT 0`
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_usdc DOUBLE PRECISION NOT NULL DEFAULT 0`
 
+      // Stake lock start time (for real lock-progress). Backfill existing
+      // active stakes from their last reward timestamp.
+      await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS staked_at TIMESTAMPTZ`
+      await sql`UPDATE accounts SET staked_at = reward_updated_at WHERE staked_at IS NULL AND staked > 0`
+
       // ---- One-time pre-launch test-data wipe ----
       // Clears fake balances created by the old simulated deposit/buy. Runs
       // exactly once (tracked in app_meta), automatically on deploy.

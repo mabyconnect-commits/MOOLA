@@ -20,10 +20,10 @@ export default function Presale({ v }: { v: MoolaVals }) {
         <div style={css('font-size:40px;font-weight:800;margin:4px 0;letter-spacing:-1px')}>$0.01</div>
         <div style={css('display:inline-block;padding:5px 14px;border-radius:14px;background:rgba(8,16,38,.4);font-size:12.5px;color:#9fefc6')}>▲ Next stage $0.015</div>
         <div style={css('height:9px;border-radius:6px;background:rgba(8,16,38,.5);margin:16px 0 7px;overflow:hidden')}>
-          <div style={css('width:3%;height:100%;background:linear-gradient(90deg,#23d39a,#f2b34e)')}></div>
+          <div style={css('width:' + v.soldBarWidth + ';height:100%;background:linear-gradient(90deg,#23d39a,#f2b34e)')}></div>
         </div>
         <div style={css('display:flex;justify-content:space-between;font-size:12px;color:#92b8a3')}>
-          <span>2,300,000 sold</span><span>700,000,000 total</span>
+          <span>{v.soldStr} sold</span><span>{v.totalStr} total</span>
         </div>
       </div>
 

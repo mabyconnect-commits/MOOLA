@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { faqData, nfts as nftBase, refLevels, refRows, roadmap, type Nft } from './data'
-import { api, clearToken, getToken, setToken, type Account, type ApiTxn, type RefRow, type ReferralData } from './api'
+import { api, clearToken, getToken, setToken, type Account, type ApiTxn, type RefRow, type ReferralData, type Stats } from './api'
 
 export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me'
 export type AuthView = 'welcome' | 'signup' | 'verify' | 'login'
@@ -68,7 +68,14 @@ interface MoolaState {
   refInput: string
   refCommissionStr: string
   refRowsData: RefRow[]
+  stats: Stats
+  stakedAt: number | null
 }
+
+// Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
+// live numbers before the first hydrate and grows with real activity.
+const BASE_STATS: Stats = { raised: 23_000, holders: 1_300, sold: 2_300_000, total: 700_000_000 }
+const STAKE_DAYS = 20
 
 const initialState: MoolaState = {
   screen: 'stake',
@@ -128,6 +135,8 @@ const initialState: MoolaState = {
   refInput: '',
   refCommissionStr: '0.000',
   refRowsData: refRows,
+  stats: BASE_STATS,
+  stakedAt: null,
 }
 
 function fmt(n: number, d: number): string {
@@ -223,6 +232,7 @@ export function useMoola() {
       usdc: acc.usdc,
       minted: acc.minted,
       airdropClaimed: acc.airdropClaimed,
+      stakedAt: acc.stakedAt,
       ...(txns ? { txns } : {}),
     })
   }
@@ -231,6 +241,11 @@ export function useMoola() {
   const applyReferral = (r?: ReferralData) => {
     if (!r) return
     set({ refCode: r.code, refCommissionStr: r.commissionStr, refRowsData: r.rows })
+  }
+
+  // Merge live launch stats (real presale activity + holder count).
+  const applyStats = (st?: Stats) => {
+    if (st) set({ stats: st })
   }
 
   // Capture a ?ref=CODE from the share link so it rides along on signup.
@@ -253,6 +268,7 @@ export function useMoola() {
         if (cancelled) return
         applyAccount(r.account, r.txns)
         applyReferral(r.referral)
+        applyStats(r.stats)
         set({ authed: true, screen: 'home', booting: false })
         // Warm the deterministic deposit address in the background so the
         // deposit sheet opens instantly (and never re-generates it).
@@ -343,6 +359,7 @@ export function useMoola() {
       if (r.token) setToken(r.token)
       applyAccount(r.account, r.txns)
       applyReferral(r.referral)
+      applyStats(r.stats)
       set({ authed: true, password: '', confirm: '', code: '', screen: 'home', claim: false, claimStep: 1, booting: false })
     } catch (e) {
       flash(errMsg(e))
@@ -372,6 +389,7 @@ export function useMoola() {
       if (r.token) setToken(r.token)
       applyAccount(r.account, r.txns)
       applyReferral(r.referral)
+      applyStats(r.stats)
       set({ authed: true, password: '', screen: 'home', claim: false, booting: false })
     } catch (e) {
       const data = (e as { data?: { needsVerify?: boolean; devCode?: string | null } }).data
@@ -437,6 +455,7 @@ export function useMoola() {
     try {
       const r = await api.action('buy', { amount: amt, ccy })
       applyAccount(r.account, r.txns)
+      applyStats(r.stats)
       if (r.needsDeposit) {
         set({ deposit: true, depositAsset: r.depositAsset || ccy, depositAmt: r.depositAmt || '' })
         flash('Deposit ' + ccy + ' on Solana to continue')
@@ -518,6 +537,7 @@ export function useMoola() {
     try {
       const r = await api.action('claim-airdrop', { claimAddr: addr })
       applyAccount(r.account, r.txns)
+      applyStats(r.stats)
       set({ claim: false, claimStep: 1, claimAddr: '' })
       flash('🎉 200 $MOOLA airdrop claimed & staked!')
     } catch (e) {
@@ -539,6 +559,20 @@ export function useMoola() {
   const buyUsd = s.payCcy === 'SOL' ? solNum * SOL_PRICE : solNum
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.moolas.site'
   const refLink = s.refCode ? `${origin}/?ref=${s.refCode}` : origin
+
+  // ---- live launch stats (real, server-authoritative) ----
+  const st = s.stats
+  const soldPct = Math.min(100, (st.sold / st.total) * 100)
+  const raisedK = st.raised / 1000
+  const raisedStr =
+    st.raised >= 1000 ? '$' + (raisedK >= 100 ? Math.round(raisedK) : raisedK.toFixed(1)) + 'K' : '$' + fmt(st.raised, 0)
+
+  // ---- real stake lock progress (from stakedAt over STAKE_DAYS days) ----
+  // Just-claimed stakes read as "Day 1 of 20"; capped at the full term.
+  const lockElapsedMs = s.staked > 0 && s.stakedAt ? Math.max(0, Date.now() - s.stakedAt) : 0
+  const lockDayNum = s.staked > 0 ? Math.min(STAKE_DAYS, Math.floor(lockElapsedMs / 86400000) + 1) : 0
+  const lockLeft = s.staked > 0 ? Math.max(0, STAKE_DAYS - lockDayNum) : STAKE_DAYS
+  const lockPct = s.staked > 0 ? Math.min(100, (lockDayNum / STAKE_DAYS) * 100) : 0
 
   const faqs = faqData.map((f, i) => ({
     q: f.q,
@@ -615,6 +649,17 @@ export function useMoola() {
     roadmap,
     faqs,
     refLevels,
+    // live launch stats (real, from the server)
+    raisedStr,
+    holdersStr: fmt(st.holders, 0),
+    soldStr: fmt(st.sold, 0),
+    totalStr: fmt(st.total, 0),
+    soldPctStr: (soldPct < 10 ? soldPct.toFixed(1) : Math.round(soldPct).toString()) + '%',
+    soldBarWidth: Math.max(2, soldPct).toFixed(soldPct < 10 ? 2 : 0) + '%',
+    // real stake lock progress
+    lockDayStr: 'Day ' + lockDayNum + ' of ' + STAKE_DAYS,
+    lockLeftStr: lockLeft <= 0 ? 'Unlocked' : '~' + lockLeft + (lockLeft === 1 ? ' day left' : ' days left'),
+    lockBarWidth: lockPct.toFixed(lockPct < 10 ? 1 : 0) + '%',
     nfts: nftBase.map((n) => ({ ...n, mint: () => doMint(n) })),
     txns: s.txns.map((t) => ({ ...t, amtColor: t.pos ? '#23d39a' : '#ff8f8f' })),
     // modals

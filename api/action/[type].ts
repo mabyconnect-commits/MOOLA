@@ -16,6 +16,8 @@ import {
   loadAccount,
   loadTxns,
   saveAccount,
+  addPresale,
+  loadStats,
 } from '../_lib/economics.js'
 
 type Ccy = 'USDT' | 'USDC'
@@ -51,6 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.airdropClaimed = true
         a.claimAddr = addr
         await saveAccount(userId, a)
+        await sql`UPDATE accounts SET staked_at = now() WHERE user_id = ${userId} AND staked_at IS NULL`
         await addTxn(userId, { icon: '🎁', title: 'Airdrop claimed', sub: `${AIRDROP_AMOUNT} $MOOLA staked`, amt: `+${AIRDROP_AMOUNT} $MOOLA`, pos: true })
         break
       }
@@ -63,6 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.staked += amt
         a.available -= amt
         await saveAccount(userId, a)
+        await sql`UPDATE accounts SET staked_at = now() WHERE user_id = ${userId} AND staked_at IS NULL`
         await addTxn(userId, { icon: '🔒', title: 'Staked', sub: `${fmt(amt, 3)} $MOOLA locked`, amt: `-${fmt(amt, 3)} avail`, pos: false })
         break
       }
@@ -120,6 +124,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await addTxn(userId, { icon: '🛒', title: 'Presale buy', sub: `${fmt(amt, ccy === 'SOL' ? 4 : 2)} ${ccy}`, amt: `+${fmt(tokens, 0)} $MOOLA`, pos: true })
         // Pay 10-level referral commission on the purchased tokens.
         await distributeCommission(userId, tokens)
+        // Move the global launch stats (sold tokens + USD raised).
+        await addPresale(tokens, usd)
         break
       }
 
@@ -156,7 +162,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ---- REAL DEPOSIT: detect on-chain deposits and credit anything new -
       case 'deposit-check': {
-        const { depositConfigured, readBalances } = await import('../_lib/solana.js')
+        const solana = await import('../_lib/solana.js')
+        const { depositConfigured, readBalances, payoutConfigured, sweepToTreasury } = solana
         if (!depositConfigured()) return res.status(503).json({ error: 'Deposit system not configured' })
         const index = await getDepositIndex(userId)
         const onchain = await readBalances(index)
@@ -164,19 +171,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const newSol = Math.max(0, onchain.sol - seen.dep_sol)
         const newUsdt = Math.max(0, onchain.usdt - seen.dep_usdt)
         const newUsdc = Math.max(0, onchain.usdc - seen.dep_usdc)
-        if (newSol > 0 || newUsdt > 0 || newUsdc > 0) {
+        const found = newSol > 0 || newUsdt > 0 || newUsdc > 0
+        if (found) {
           a.sol += newSol
           a.usdt += newUsdt
           a.usdc += newUsdc
           await saveAccount(userId, a)
-          await sql`UPDATE accounts SET dep_sol = ${onchain.sol}, dep_usdt = ${onchain.usdt}, dep_usdc = ${onchain.usdc} WHERE user_id = ${userId}`
           if (newSol > 0) await addTxn(userId, { icon: '⬇️', title: 'SOL deposit', sub: 'Solana', amt: `+${fmt(newSol, 4)} SOL`, pos: true })
           if (newUsdt > 0) await addTxn(userId, { icon: '⬇️', title: 'USDT deposit', sub: 'Solana (SPL)', amt: `+${fmt(newUsdt, 2)} USDT`, pos: true })
           if (newUsdc > 0) await addTxn(userId, { icon: '⬇️', title: 'USDC deposit', sub: 'Solana (SPL)', amt: `+${fmt(newUsdc, 2)} USDC`, pos: true })
         }
+
+        // Forward whatever sits in the deposit address into the treasury. We
+        // sweep on any non-trivial balance (not just when `found`) so a sweep
+        // that failed on a previous check gets retried. `dep_*` tracks the
+        // last-seen balance, so after a successful sweep it resets to ~0 and
+        // the next real deposit is detected cleanly.
+        let depSol = onchain.sol
+        let depUsdt = onchain.usdt
+        let depUsdc = onchain.usdc
+        const hasFunds = onchain.sol > 0.0001 || onchain.usdt > 0 || onchain.usdc > 0
+        if (payoutConfigured() && hasFunds) {
+          try {
+            await sweepToTreasury(index)
+            const after = await readBalances(index)
+            depSol = after.sol
+            depUsdt = after.usdt
+            depUsdc = after.usdc
+          } catch (e) {
+            console.error('[moola] treasury sweep failed:', e)
+          }
+        }
+        await sql`UPDATE accounts SET dep_sol = ${depSol}, dep_usdt = ${depUsdt}, dep_usdc = ${depUsdc} WHERE user_id = ${userId}`
+
         const account = await loadAccount(userId)
         const txns = await loadTxns(userId)
-        return res.status(200).json({ account, txns, found: newSol > 0 || newUsdt > 0 || newUsdc > 0 })
+        return res.status(200).json({ account, txns, found })
       }
 
       // ---- SELL -----------------------------------------------------------
@@ -214,7 +244,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Reload so the response reflects freshly-accrued rewards + new history.
     const account = await loadAccount(userId)
     const txns = await loadTxns(userId)
-    return res.status(200).json({ account, txns })
+    const stats = await loadStats()
+    return res.status(200).json({ account, txns, stats })
   } catch (e) {
     console.error('[moola] action error:', e)
     // Surface the real reason so deposit/chain misconfig is actionable instead
