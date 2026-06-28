@@ -26,8 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureSchema()
   } catch (e) {
     console.error('[moola] schema init failed:', e)
-    // TEMP: surface the real reason so we can diagnose in production.
-    return res.status(500).json({ error: 'DB init: ' + (e instanceof Error ? e.message : String(e)) })
+    return res.status(500).json({ error: 'Service is temporarily unavailable. Please try again.' })
   }
 
   const action = req.query.action as string
@@ -142,7 +141,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (e) {
     console.error('[moola] auth error:', e)
-    // TEMP: surface the real reason so we can diagnose in production.
-    return res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) })
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 }
