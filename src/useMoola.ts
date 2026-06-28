@@ -35,6 +35,7 @@ interface MoolaState {
   minted: number
   history: boolean
   settings: boolean
+  rewards: boolean
   notif: boolean
   biometric: boolean
   hideBal: boolean
@@ -75,6 +76,7 @@ const initialState: MoolaState = {
   minted: 0,
   history: false,
   settings: false,
+  rewards: false,
   notif: true,
   biometric: false,
   hideBal: false,
@@ -162,7 +164,7 @@ export function useMoola() {
   }
 
   const go = (screen: Screen) =>
-    set({ screen, wallet: false, claim: false, stakeForm: false })
+    set({ screen, wallet: false, claim: false, stakeForm: false, rewards: false })
 
   const cdString = () => {
     const t = Math.max(0, Math.floor(s.cd))
@@ -232,6 +234,24 @@ export function useMoola() {
     }
     set((p) => ({ staked: p.staked + amt, available: p.available - amt, stakeForm: false, stakeAmt: '' }))
     flash('Staked ' + fmt(amt, 3) + ' $MOOLA')
+  }
+  const claimRewards = () => {
+    const r = stateRef.current.reward
+    if (r <= 0) {
+      flash('No rewards to claim yet')
+      return
+    }
+    set((p) => ({ available: p.available + r, balance: p.balance + r, reward: 0, rewards: false }))
+    flash('✅ Claimed ' + fmt(r, 4) + ' $MOOLA to your wallet')
+  }
+  const compoundRewards = () => {
+    const r = stateRef.current.reward
+    if (r <= 0) {
+      flash('No rewards to compound yet')
+      return
+    }
+    set((p) => ({ staked: p.staked + r, balance: p.balance + r, reward: 0, rewards: false }))
+    flash('🔁 Compounded ' + fmt(r, 4) + ' $MOOLA into your stake')
   }
   const doBuy = () => {
     const sol = parseFloat(stateRef.current.solIn)
@@ -401,6 +421,14 @@ export function useMoola() {
     closeClaim: () => set({ claim: false, claimStep: 1 }),
     openStakeForm: () => set({ stakeForm: true, wallet: false }),
     closeStakeForm: () => set({ stakeForm: false }),
+    // My Rewards sheet
+    rewards: s.rewards,
+    rewardUsdStr: fmt(s.reward * 0.01, 4),
+    projectedStr: fmt(s.staked * 0.0205 * 20, 3),
+    openRewards: () => set({ rewards: true, wallet: false }),
+    closeRewards: () => set({ rewards: false }),
+    claimRewards,
+    compoundRewards,
     onSol: onInput('solIn'),
     onStakeAmt: onInput('stakeAmt'),
     setMaxStake: () => set({ stakeAmt: String(stateRef.current.available) }),

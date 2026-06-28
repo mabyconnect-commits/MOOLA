@@ -96,6 +96,49 @@ export default function Overlays({ v }: { v: MoolaVals }) {
         </div>
       )}
 
+      {/* ===== MY REWARDS ===== */}
+      {v.rewards && (
+        <div onClick={v.closeRewards} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.7);display:flex;justify-content:center;align-items:flex-end')}>
+          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;animation:riseIn .3s ease')}>
+            <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
+            <div style={css('display:flex;justify-content:space-between;align-items:center;margin-bottom:16px')}>
+              <span style={css('font-size:19px;font-weight:800')}>My Rewards</span>
+              <div onClick={v.closeRewards} style={css('width:32px;height:32px;border-radius:50%;background:rgba(6,22,14,.6);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer')}>✕</div>
+            </div>
+
+            {/* next cycle countdown */}
+            <div style={css('display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;color:#92b8a3;margin-bottom:14px')}>
+              <span style={css('width:7px;height:7px;border-radius:50%;background:#23d39a;box-shadow:0 0 8px #23d39a;animation:pulseGlow 2s ease-in-out infinite')}></span>
+              Next reward cycle in <b style={css('color:#cfe7da')}>{v.cdStr}</b>
+            </div>
+
+            {/* claimable card */}
+            <div style={css('border-radius:18px;background:linear-gradient(150deg,rgba(47,227,194,.16),rgba(242,179,78,.12));border:1px solid rgba(110,200,150,.22);padding:20px 18px;text-align:center;margin-bottom:14px')}>
+              <div style={css('font-size:12.5px;color:#bfe3d0;letter-spacing:.4px')}>CLAIMABLE REWARDS</div>
+              <div style={css('font-size:38px;font-weight:800;letter-spacing:-.6px;margin:4px 0 2px;font-variant-numeric:tabular-nums')}>{v.rewardStr}</div>
+              <div style={css('font-size:13px;color:#92b8a3')}>$MOOLA · ≈ ${v.rewardUsdStr}</div>
+            </div>
+
+            {/* claim / compound */}
+            <div style={css('display:flex;gap:11px;margin-bottom:16px')}>
+              <div onClick={v.claimRewards} style={css('flex:1;text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 6px 18px rgba(47,227,194,.3)')}>Claim to Wallet</div>
+              <div onClick={v.compoundRewards} style={css('flex:1;text-align:center;padding:14px;border-radius:14px;border:1px solid #23d39a;color:#23d39a;font-weight:700;font-size:15px;cursor:pointer')}>🔁 Compound</div>
+            </div>
+
+            {/* breakdown */}
+            <div style={css('border-radius:14px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.14);padding:14px 16px;margin-bottom:16px')}>
+              <div style={css('display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px')}><span style={css('color:#92b8a3')}>Staked</span><span style={css('font-weight:700')}>{v.stakedStr} $MOOLA</span></div>
+              <div style={css('display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px')}><span style={css('color:#92b8a3')}>Daily rate</span><span style={css('font-weight:700;color:#23d39a')}>2.05%</span></div>
+              <div style={css('display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px')}><span style={css('color:#92b8a3')}>Daily rewards</span><span style={css('font-weight:700')}>{v.dailyRewardsStr} $MOOLA</span></div>
+              <div style={css('display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px')}><span style={css('color:#92b8a3')}>Lock period</span><span style={css('font-weight:700')}>20 days</span></div>
+              <div style={css('display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px;border-top:1px solid rgba(110,200,150,.12);margin-top:4px;padding-top:9px')}><span style={css('color:#92b8a3')}>Projected (20d)</span><span style={css('font-weight:800;color:#f2b34e')}>{v.projectedStr} $MOOLA</span></div>
+            </div>
+
+            <div style={css('font-size:11.5px;color:#7ea98f;text-align:center;line-height:1.5')}>Rewards accrue every second. <b style={css('color:#cfe7da')}>Claim</b> sends them to your available balance · <b style={css('color:#cfe7da')}>Compound</b> re-stakes them to earn more.</div>
+          </div>
+        </div>
+      )}
+
       {/* ===== DEPOSIT / PAY PRESALE ===== */}
       {v.deposit && (
         <div style={css('position:fixed;inset:0;z-index:58;background:#06110b;display:flex;justify-content:center;overflow-y:auto')}>

@@ -32,7 +32,7 @@ export default function Stake({ v }: { v: MoolaVals }) {
             <div style={css('font-size:14px;color:#eafff5;display:flex;align-items:center;gap:5px;opacity:.92')}>Stake Rewards <span style={css('opacity:.6')}>ⓘ</span></div>
             <div style={css('font-size:33px;font-weight:800;letter-spacing:-.5px;margin:2px 0 8px;font-variant-numeric:tabular-nums')}>{v.rewardStr}</div>
             <div style={css('padding:6px 16px;border-radius:16px;background:rgba(8,16,38,.42);font-weight:700;font-size:15px;margin-bottom:9px')}>Daily + 2.05% 🚀</div>
-            <div onClick={v.openStakeForm} style={css('padding:7px 18px;border-radius:16px;border:1px solid rgba(255,255,255,.45);font-size:13px;font-weight:600;cursor:pointer')}>My Rewards ›</div>
+            <div onClick={v.openRewards} style={css('padding:7px 18px;border-radius:16px;border:1px solid rgba(255,255,255,.45);font-size:13px;font-weight:600;cursor:pointer')}>My Rewards ›</div>
           </div>
         </div>
       </div>
