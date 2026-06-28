@@ -22,13 +22,16 @@ const TREASURY = process.env.TREASURY_ADDRESS || ''
 const TREASURY_SECRET = process.env.TREASURY_SECRET || ''
 
 // Stablecoin mints. On devnet, set USDC_MINT / USDT_MINT in env to your test
-// mints. Defaults are Solana mainnet USDC/USDT.
-const USDC_MINT = new PublicKey(
-  process.env.USDC_MINT || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-)
-const USDT_MINT = new PublicKey(
-  process.env.USDT_MINT || 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-)
+// mints. Defaults are Solana mainnet USDC/USDT. Parsed lazily so a bad/empty
+// env value surfaces as a handled error instead of crashing module load.
+const DEFAULT_USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+const DEFAULT_USDT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
+function usdcMint(): PublicKey {
+  return new PublicKey((process.env.USDC_MINT || DEFAULT_USDC).trim())
+}
+function usdtMint(): PublicKey {
+  return new PublicKey((process.env.USDT_MINT || DEFAULT_USDT).trim())
+}
 const TOKEN_DECIMALS = 6 // USDT & USDC
 const SOL_DECIMALS = 9
 const LAMPORTS = 1e9
@@ -50,7 +53,7 @@ export function connection(): Connection {
 }
 
 function mintFor(asset: Exclude<Asset, 'SOL'>): PublicKey {
-  return asset === 'USDC' ? USDC_MINT : USDT_MINT
+  return asset === 'USDC' ? usdcMint() : usdtMint()
 }
 
 /** Deterministic per-user deposit keypair: m/44'/501'/<index>'/0'. */
@@ -86,8 +89,8 @@ export async function readBalances(index: number): Promise<{ sol: number; usdt: 
   const owner = depositKeypair(index).publicKey
   const lamports = await conn.getBalance(owner)
   const [usdt, usdc] = await Promise.all([
-    tokenBalance(conn, owner, USDT_MINT),
-    tokenBalance(conn, owner, USDC_MINT),
+    tokenBalance(conn, owner, usdtMint()),
+    tokenBalance(conn, owner, usdcMint()),
   ])
   return { sol: lamports / LAMPORTS, usdt, usdc }
 }

@@ -2,7 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ensureSchema, getDepositIndex, getDepCredited, sql } from '../_lib/db.js'
 import { SOLANA_ADDR_RE, userIdFromReq } from '../_lib/auth.js'
 import { distributeCommission } from '../_lib/referral.js'
-import { depositConfigured, depositAddress, readBalances } from '../_lib/solana.js'
+// NOTE: the Solana module (heavy deps + env-derived keys) is imported lazily
+// inside the deposit cases only, so a misconfig there can never crash the whole
+// action function (which would 500 every action — claim, stake, buy, …).
 import {
   AIRDROP_AMOUNT,
   PRESALE_PRICE,
@@ -125,6 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Simulated credit — ONLY allowed when the on-chain deposit system
         // isn't configured (local/dev). In production this is disabled so
         // nobody can credit themselves free balance.
+        const { depositConfigured } = await import('../_lib/solana.js')
         if (depositConfigured()) {
           return res.status(400).json({ error: 'Use the deposit address — funds are credited on-chain.' })
         }
@@ -142,6 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ---- REAL DEPOSIT: return the user's unique on-chain address --------
       case 'deposit-address': {
+        const { depositConfigured, depositAddress } = await import('../_lib/solana.js')
         if (!depositConfigured()) return res.status(503).json({ error: 'Deposit system not configured' })
         const index = await getDepositIndex(userId)
         return res.status(200).json({ address: depositAddress(index) })
@@ -149,6 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ---- REAL DEPOSIT: detect on-chain deposits and credit anything new -
       case 'deposit-check': {
+        const { depositConfigured, readBalances } = await import('../_lib/solana.js')
         if (!depositConfigured()) return res.status(503).json({ error: 'Deposit system not configured' })
         const index = await getDepositIndex(userId)
         const onchain = await readBalances(index)
