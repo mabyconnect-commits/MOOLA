@@ -8,7 +8,7 @@ export default function Auth({ v }: { v: MoolaVals }) {
       <div style={css('position:absolute;top:-70px;left:-90px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,#23d39a 0%,transparent 70%);opacity:.18;pointer-events:none')}></div>
       <div style={css('position:absolute;top:90px;right:-120px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,#f2b34e 0%,transparent 70%);opacity:.16;pointer-events:none')}></div>
 
-      <div style={css('position:relative;min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:40px 26px')}>
+      <div style={css('position:relative;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:34px 26px')}>
         {v.authChrome && (
           <div style={css('display:flex;flex-direction:column;align-items:center;margin-bottom:30px')}>
             <div style={css('width:84px;height:84px;filter:drop-shadow(0 0 26px rgba(35,211,154,.5));animation:floaty 6s ease-in-out infinite')}><CalfLogo /></div>
@@ -18,20 +18,30 @@ export default function Auth({ v }: { v: MoolaVals }) {
         )}
 
         {v.authWelcome && (
-          <div style={css('animation:riseIn .45s ease;text-align:center')}>
-            <div style={css('font-size:32px;font-weight:800;letter-spacing:.5px;line-height:1.05;text-transform:uppercase')}>$MOOLA<br />Airdrop</div>
-            <div style={css('font-size:15px;color:#bfe3d0;margin-top:10px;font-weight:500')}>The Best Web3.0 Community Token</div>
-
-            <div style={css('position:relative;margin:22px 0 26px;height:330px')}>
-              {v.orbs.map((o, i) => (
-                <div key={i} style={css(o.style)}></div>
-              ))}
-              <div style={css('position:absolute;left:50%;bottom:6px;transform:translateX(-50%);width:82%;height:30px;border-radius:50%;background:radial-gradient(ellipse,rgba(35,211,154,.5),transparent 70%);filter:blur(7px);pointer-events:none')}></div>
-              <img src="assets/moola-hero-full.png" alt="Moola" style={css('position:relative;display:block;width:84%;max-width:300px;margin:0 auto;border-radius:24px;animation:floaty 6s ease-in-out infinite;filter:drop-shadow(0 0 32px rgba(35,211,154,.4))')} />
+          <div style={css('animation:riseIn .45s ease;text-align:center;display:flex;flex-direction:column;min-height:calc(100dvh - 68px)')}>
+            {/* top: title */}
+            <div style={css('padding-top:4px')}>
+              <div style={css('font-size:34px;font-weight:800;letter-spacing:.5px;line-height:1.04;text-transform:uppercase')}>$MOOLA<br />Airdrop</div>
+              <div style={css('font-size:14.5px;color:#bfe3d0;margin-top:9px;font-weight:500')}>The Best Web3.0 Community Token</div>
             </div>
 
-            <div onClick={v.goSignup} style={css('padding:17px;border-radius:30px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 10px 30px rgba(35,211,154,.35);letter-spacing:.3px')}>Sign Up</div>
-            <div onClick={v.goLogin} style={css('margin-top:14px;padding:17px;border-radius:30px;background:#fff;color:#0a1d14;font-weight:700;font-size:16px;cursor:pointer;letter-spacing:.3px')}>Sign In</div>
+            {/* middle: hero (image + orb ring) fills available space */}
+            <div style={css('flex:1;display:flex;align-items:center;justify-content:center;margin:6px 0')}>
+              <div style={css('position:relative;width:100%;max-width:320px;height:330px;margin:0 auto')}>
+                {v.orbs.map((o, i) => (
+                  <div key={i} style={css(o.style)}></div>
+                ))}
+                <div style={css('position:absolute;left:50%;bottom:6px;transform:translateX(-50%);width:82%;height:30px;border-radius:50%;background:radial-gradient(ellipse,rgba(35,211,154,.5),transparent 70%);filter:blur(7px);pointer-events:none')}></div>
+                <img src="assets/moola-hero-full.png" alt="Moola" style={css('position:relative;display:block;width:84%;max-width:290px;margin:0 auto;border-radius:24px;animation:floaty 6s ease-in-out infinite;filter:drop-shadow(0 0 32px rgba(35,211,154,.4))')} />
+              </div>
+            </div>
+
+            {/* bottom: actions */}
+            <div style={css('padding-bottom:2px')}>
+              <div onClick={v.goSignup} style={css('padding:17px;border-radius:30px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 10px 30px rgba(35,211,154,.35);letter-spacing:.3px')}>Sign Up</div>
+              <div onClick={v.goLogin} style={css('margin-top:13px;padding:17px;border-radius:30px;background:#fff;color:#0a1d14;font-weight:700;font-size:16px;cursor:pointer;letter-spacing:.3px')}>Sign In</div>
+              <div style={css('font-size:11.5px;color:#5e7d6a;margin-top:16px;line-height:1.5')}>By continuing you agree to Moola's Terms &amp; Privacy Policy.</div>
+            </div>
           </div>
         )}
 
