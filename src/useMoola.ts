@@ -60,6 +60,7 @@ interface MoolaState {
   code: string
   demoCode: string
   showPw: boolean
+  joinedTg: boolean
   txns: ApiTxn[]
 }
 
@@ -113,6 +114,7 @@ const initialState: MoolaState = {
   code: '',
   demoCode: '',
   showPw: false,
+  joinedTg: false,
   txns: [],
 }
 
@@ -165,6 +167,8 @@ export function useMoola() {
     // If we already hold a session token, boot straight into a loading state
     // and hydrate from the server rather than flashing the welcome screen.
     booting: typeof window !== 'undefined' && !!getToken(),
+    // Remember whether the user already joined Telegram (gates the claim).
+    joinedTg: typeof window !== 'undefined' && localStorage.getItem('moola_tg') === '1',
   }))
   const stateRef = useRef(s)
   stateRef.current = s
@@ -622,12 +626,19 @@ export function useMoola() {
     confirmClaim,
     copyRef,
     toastSoon: () => flash('Coming soon ✨'),
+    joinedTg: s.joinedTg,
     joinTelegram: () => {
       try {
-        window.open('https://t.me/moola_io', '_blank')
+        window.open('https://t.me/MoolaAirdrop', '_blank')
       } catch {
         /* ignore */
       }
+      try {
+        localStorage.setItem('moola_tg', '1')
+      } catch {
+        /* ignore */
+      }
+      set({ joinedTg: true })
       flash('Opening Telegram…')
     },
     // history / settings
