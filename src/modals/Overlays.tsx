@@ -368,11 +368,6 @@ export default function Overlays({ v }: { v: MoolaVals }) {
           </div>
         </div>
       )}
-
-      {/* toast */}
-      {v.toast && (
-        <div style={css('position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:120;padding:11px 20px;border-radius:24px;background:rgba(10,18,42,.95);border:1px solid rgba(110,200,150,.3);font-size:13.5px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.5);animation:pop .3s ease')}>{v.toast}</div>
-      )}
     </>
   )
 }
