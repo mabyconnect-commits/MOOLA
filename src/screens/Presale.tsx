@@ -30,7 +30,7 @@ export default function Presale({ v }: { v: MoolaVals }) {
       <div style={css('border-radius:20px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);padding:18px 16px;margin-bottom:16px')}>
         {/* pay-with currency switch: USDT or USDC */}
         <div style={css('display:flex;gap:8px;padding:5px;border-radius:14px;background:rgba(8,16,38,.5);border:1px solid rgba(110,200,150,.16);margin-bottom:14px')}>
-          {(['USDT', 'USDC'] as const).map((c) => (
+          {(['USDT', 'USDC', 'SOL'] as const).map((c) => (
             <div
               key={c}
               onClick={() => v.setPayCcy(c)}
@@ -48,14 +48,14 @@ export default function Presale({ v }: { v: MoolaVals }) {
         {/* selected balance + deposit */}
         <div style={css('display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-radius:13px;background:rgba(38,161,123,.12);border:1px solid rgba(47,214,166,.25);margin-bottom:14px')}>
           <div style={css('display:flex;align-items:center;gap:9px')}>
-            <div style={css('width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#26a17b,#2fd6a6);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff')}>{v.payCcy === 'USDT' ? '₮' : '$'}</div>
+            <div style={css('width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#26a17b,#2fd6a6);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff')}>{v.payCcy === 'SOL' ? '◎' : v.payCcy === 'USDT' ? '₮' : '$'}</div>
             <div><div style={css('font-size:11.5px;color:#92b8a3')}>{v.payCcy} balance · Solana</div><div style={css('font-size:15px;font-weight:700')}>{v.payBalStr} {v.payCcy}</div></div>
           </div>
           <div onClick={() => v.openDeposit(v.payCcy)} style={css('padding:8px 16px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:13px;cursor:pointer')}>Deposit</div>
         </div>
 
         <div style={css('display:flex;align-items:center;gap:8px;margin-bottom:8px')}>
-          <div style={css('width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#26a17b,#2fd6a6);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff')}>{v.payCcy === 'USDT' ? '₮' : '$'}</div>
+          <div style={css('width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#26a17b,#2fd6a6);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff')}>{v.payCcy === 'SOL' ? '◎' : v.payCcy === 'USDT' ? '₮' : '$'}</div>
           <span style={css('font-size:13px;color:#92b8a3')}>You pay · {v.payCcy} (Solana)</span>
         </div>
         <div style={css('display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:13px;background:rgba(8,16,38,.5);border:1px solid rgba(110,200,150,.18);margin-bottom:14px')}>
@@ -71,7 +71,7 @@ export default function Presale({ v }: { v: MoolaVals }) {
           <span style={css('font-weight:700;color:#cfe7da')}>$MOOLA</span>
         </div>
         <div onClick={v.doBuy} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#f2b34e);color:#06160e;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 6px 20px rgba(47,227,194,.32)')}>{v.buyCtaLabel}</div>
-        <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Pay with USDT or USDC on the Solana network (SPL) · auto-stakes on purchase · fee 7%</div>
+        <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Pay with USDT, USDC or SOL on the Solana network · auto-stakes on purchase · fee 7%</div>
       </div>
 
       <div style={css('border-radius:20px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);padding:18px 16px')}>

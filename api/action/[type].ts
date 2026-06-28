@@ -94,27 +94,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ---- PRESALE BUY ----------------------------------------------------
       case 'buy': {
         const amt = Number(body.amount)
-        const ccy: Ccy = body.ccy === 'USDC' ? 'USDC' : 'USDT'
-        if (!amt || amt <= 0) return res.status(400).json({ error: 'Enter a USDT / USDC amount' })
-        const bal = ccy === 'USDT' ? a.usdt : a.usdc
+        const ccy: Asset = body.ccy === 'USDC' ? 'USDC' : body.ccy === 'SOL' ? 'SOL' : 'USDT'
+        if (!amt || amt <= 0) return res.status(400).json({ error: 'Enter an amount' })
+        const bal = ccy === 'USDT' ? a.usdt : ccy === 'USDC' ? a.usdc : a.sol
         if (bal < amt) {
-          // Not enough stablecoin — route the user to deposit the difference.
+          // Not enough of the chosen coin — route the user to deposit the difference.
           const needed = amt - bal
           return res.status(200).json({
             account: a,
             txns: await loadTxns(userId),
             needsDeposit: true,
             depositAsset: ccy,
-            depositAmt: needed.toFixed(2),
+            depositAmt: needed.toFixed(ccy === 'SOL' ? 4 : 2),
           })
         }
-        const tokens = Math.floor(amt / PRESALE_PRICE)
+        // USDT/USDC ≈ $1; SOL is converted via SOL_PRICE.
+        const usd = ccy === 'SOL' ? amt * SOL_PRICE : amt
+        const tokens = Math.floor(usd / PRESALE_PRICE)
         if (ccy === 'USDT') a.usdt -= amt
-        else a.usdc -= amt
+        else if (ccy === 'USDC') a.usdc -= amt
+        else a.sol -= amt
         a.balance += tokens
         a.available += tokens
         await saveAccount(userId, a)
-        await addTxn(userId, { icon: '🛒', title: 'Presale buy', sub: `${fmt(amt, 2)} ${ccy}`, amt: `+${fmt(tokens, 0)} $MOOLA`, pos: true })
+        await addTxn(userId, { icon: '🛒', title: 'Presale buy', sub: `${fmt(amt, ccy === 'SOL' ? 4 : 2)} ${ccy}`, amt: `+${fmt(tokens, 0)} $MOOLA`, pos: true })
         // Pay 10-level referral commission on the purchased tokens.
         await distributeCommission(userId, tokens)
         break

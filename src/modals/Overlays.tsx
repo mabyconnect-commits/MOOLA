@@ -7,7 +7,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
       {/* ===== WALLET DRAWER ===== */}
       {v.wallet && (
         <div onClick={v.closeWallet} style={css('position:fixed;inset:0;z-index:50;background:rgba(3,8,5,.62);display:flex;justify-content:center;align-items:flex-end')}>
-          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;animation:riseIn .3s ease')}>
+          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;max-height:92dvh;overflow-y:auto;animation:riseIn .3s ease')}>
             <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
             <div style={css('display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px')}>
               <div>
@@ -103,7 +103,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
       {/* ===== STAKE FORM ===== */}
       {v.stakeForm && (
         <div onClick={v.closeStakeForm} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.7);display:flex;justify-content:center;align-items:flex-end')}>
-          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;animation:riseIn .3s ease')}>
+          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;max-height:92dvh;overflow-y:auto;animation:riseIn .3s ease')}>
             <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
             <div style={css('display:flex;justify-content:space-between;align-items:center;margin-bottom:16px')}>
               <span style={css('font-size:19px;font-weight:800')}>Stake $MOOLA</span>
@@ -129,7 +129,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
       {/* ===== MY REWARDS ===== */}
       {v.rewards && (
         <div onClick={v.closeRewards} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.7);display:flex;justify-content:center;align-items:flex-end')}>
-          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;animation:riseIn .3s ease')}>
+          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;max-height:92dvh;overflow-y:auto;animation:riseIn .3s ease')}>
             <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
             <div style={css('display:flex;justify-content:space-between;align-items:center;margin-bottom:16px')}>
               <span style={css('font-size:19px;font-weight:800')}>My Rewards</span>
@@ -172,7 +172,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
       {/* ===== STAKING DETAILS ===== */}
       {v.details && (
         <div onClick={v.closeDetails} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.7);display:flex;justify-content:center;align-items:flex-end')}>
-          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;animation:riseIn .3s ease')}>
+          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;max-height:92dvh;overflow-y:auto;animation:riseIn .3s ease')}>
             <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
             <div style={css('display:flex;justify-content:space-between;align-items:center;margin-bottom:16px')}>
               <span style={css('font-size:19px;font-weight:800')}>Staking Details</span>
@@ -268,7 +268,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
       {/* ===== SELL ===== */}
       {v.sell && (
         <div onClick={v.closeSell} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.7);display:flex;justify-content:center;align-items:flex-end')}>
-          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;animation:riseIn .3s ease')}>
+          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;max-height:92dvh;overflow-y:auto;animation:riseIn .3s ease')}>
             <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
             <div style={css('display:flex;justify-content:space-between;align-items:center;margin-bottom:16px')}>
               <span style={css('font-size:19px;font-weight:800')}>Sell $MOOLA</span>

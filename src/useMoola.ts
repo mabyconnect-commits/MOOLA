@@ -24,7 +24,7 @@ interface MoolaState {
   sol: number
   usdt: number
   usdc: number
-  payCcy: 'USDT' | 'USDC'
+  payCcy: 'USDT' | 'USDC' | 'SOL'
   cd: number
   copyLabel: string
   toast: string
@@ -422,7 +422,7 @@ export function useMoola() {
   // to route them to deposit the difference.
   const doBuy = async () => {
     const amt = parseFloat(stateRef.current.solIn)
-    if (!amt || amt <= 0) return flash('Enter a USDT / USDC amount')
+    if (!amt || amt <= 0) return flash('Enter an amount')
     const ccy = stateRef.current.payCcy
     try {
       const r = await api.action('buy', { amount: amt, ccy })
@@ -432,9 +432,9 @@ export function useMoola() {
         flash('Deposit ' + ccy + ' on Solana to continue')
         return
       }
-      const tokens = Math.floor(amt / 0.01)
+      const tokens = Math.floor((ccy === 'SOL' ? amt * 152 : amt) / 0.01)
       set({ solIn: '' })
-      flash('✅ Bought ' + fmt(tokens, 0) + ' $MOOLA with ' + fmt(amt, 2) + ' ' + ccy)
+      flash('✅ Bought ' + fmt(tokens, 0) + ' $MOOLA with ' + fmt(amt, ccy === 'SOL' ? 4 : 2) + ' ' + ccy)
     } catch (e) {
       flash(errMsg(e))
     }
@@ -521,7 +521,10 @@ export function useMoola() {
   const dim = '#5e7d6a'
   const solNum = parseFloat(s.solIn) || 0
   const stakeNum = parseFloat(s.stakeAmt) || 0
-  const payBal = s.payCcy === 'USDT' ? s.usdt : s.usdc
+  const SOL_PRICE = 152 // illustrative SOL→USD used for presale quotes
+  const payBal = s.payCcy === 'USDT' ? s.usdt : s.payCcy === 'USDC' ? s.usdc : s.sol
+  // $MOOLA bought: stablecoins ≈ $1, SOL converted via SOL_PRICE.
+  const buyUsd = s.payCcy === 'SOL' ? solNum * SOL_PRICE : solNum
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.moolas.site'
   const refLink = s.refCode ? `${origin}/?ref=${s.refCode}` : origin
 
@@ -633,12 +636,12 @@ export function useMoola() {
     // presale / stake form inputs
     solIn: s.solIn,
     stakeAmt: s.stakeAmt,
-    buyTokens: solNum > 0 ? fmt(Math.floor(solNum / 0.01), 0) : '0',
+    buyTokens: solNum > 0 ? fmt(Math.floor(buyUsd / 0.01), 0) : '0',
     // presale pays in USDT or USDC: if the user already holds enough of the
     // chosen coin they can buy now, otherwise the CTA routes them to deposit.
     payCcy: s.payCcy,
-    payBalStr: fmt(payBal, 2),
-    setPayCcy: (c: 'USDT' | 'USDC') => set({ payCcy: c }),
+    payBalStr: fmt(payBal, s.payCcy === 'SOL' ? 4 : 2),
+    setPayCcy: (c: 'USDT' | 'USDC' | 'SOL') => set({ payCcy: c }),
     buyNeedsDeposit: solNum > 0 && payBal < solNum,
     buyCtaLabel: solNum > 0 && payBal < solNum ? `Deposit ${s.payCcy} to continue` : 'Buy $MOOLA',
     stakeEstTotal: stakeNum > 0 ? fmt(stakeNum * 0.0205 * 20, 3) : '0.000',
