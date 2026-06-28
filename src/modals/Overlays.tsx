@@ -205,7 +205,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
 
       {/* ===== DEPOSIT (SOL or USDT on Solana / SPL) ===== */}
       {v.deposit && (
-        <div style={css('position:fixed;inset:0;z-index:58;background:#06110b;display:flex;justify-content:center;overflow-y:auto')}>
+        <div style={css('position:fixed;inset:0;z-index:58;background:#06110b;display:flex;justify-content:center;overflow-x:hidden;overflow-y:auto')}>
           <div style={css('width:440px;max-width:100vw;min-height:100%;padding:18px 18px 40px;background:radial-gradient(130% 70% at 50% -5%, #123a2a 0%, #0a1d14 45%, #06110b 100%)')}>
             <div style={css('display:flex;align-items:center;gap:12px;margin-bottom:22px')}>
               <div onClick={v.closeDeposit} style={css('width:36px;height:36px;border-radius:50%;background:rgba(15,40,28,.7);border:1px solid rgba(110,200,150,.2);display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer')}>‹</div>
@@ -291,7 +291,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
 
       {/* ===== TRANSACTION HISTORY ===== */}
       {v.history && (
-        <div style={css('position:fixed;inset:0;z-index:58;background:#06110b;display:flex;justify-content:center;overflow-y:auto')}>
+        <div style={css('position:fixed;inset:0;z-index:58;background:#06110b;display:flex;justify-content:center;overflow-x:hidden;overflow-y:auto')}>
           <div style={css('width:440px;max-width:100vw;min-height:100%;padding:18px 18px 40px;background:radial-gradient(130% 70% at 50% -5%, #123a2a 0%, #0a1d14 45%, #06110b 100%)')}>
             <div style={css('display:flex;align-items:center;gap:12px;margin-bottom:20px')}>
               <div onClick={v.closeHistory} style={css('width:36px;height:36px;border-radius:50%;background:rgba(15,40,28,.7);border:1px solid rgba(110,200,150,.2);display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer')}>‹</div>
@@ -323,7 +323,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
 
       {/* ===== SETTINGS ===== */}
       {v.settings && (
-        <div style={css('position:fixed;inset:0;z-index:58;background:#06110b;display:flex;justify-content:center;overflow-y:auto')}>
+        <div style={css('position:fixed;inset:0;z-index:58;background:#06110b;display:flex;justify-content:center;overflow-x:hidden;overflow-y:auto')}>
           <div style={css('width:440px;max-width:100vw;min-height:100%;padding:18px 18px 40px;background:radial-gradient(130% 70% at 50% -5%, #123a2a 0%, #0a1d14 45%, #06110b 100%)')}>
             <div style={css('display:flex;align-items:center;gap:12px;margin-bottom:20px')}>
               <div onClick={v.closeSettings} style={css('width:36px;height:36px;border-radius:50%;background:rgba(15,40,28,.7);border:1px solid rgba(110,200,150,.2);display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer')}>‹</div>
@@ -367,11 +367,6 @@ export default function Overlays({ v }: { v: MoolaVals }) {
             <div style={css('text-align:center;font-size:11.5px;color:#5e7d6a;margin-top:16px')}>Moola v1.0.0 · Built on Solana</div>
           </div>
         </div>
-      )}
-
-      {/* toast */}
-      {v.toast && (
-        <div style={css('position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:120;padding:11px 20px;border-radius:24px;background:rgba(10,18,42,.95);border:1px solid rgba(110,200,150,.3);font-size:13.5px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.5);animation:pop .3s ease')}>{v.toast}</div>
       )}
     </>
   )

@@ -4,7 +4,7 @@ import type { MoolaVals } from './useMoola'
 
 export default function Auth({ v }: { v: MoolaVals }) {
   return (
-    <div style={css('position:absolute;inset:0;z-index:80;overflow-y:auto;background:radial-gradient(130% 80% at 50% -10%, #123a2a 0%, #0a1d14 45%, #06110b 100%)')}>
+    <div style={css('position:absolute;inset:0;z-index:80;overflow-x:hidden;overflow-y:auto;background:radial-gradient(130% 80% at 50% -10%, #123a2a 0%, #0a1d14 45%, #06110b 100%)')}>
       <div style={css('position:absolute;top:-70px;left:-90px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,#23d39a 0%,transparent 70%);opacity:.18;pointer-events:none')}></div>
       <div style={css('position:absolute;top:90px;right:-120px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,#f2b34e 0%,transparent 70%);opacity:.16;pointer-events:none')}></div>
 

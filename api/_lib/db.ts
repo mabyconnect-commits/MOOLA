@@ -1,4 +1,22 @@
-import { sql } from '@vercel/postgres'
+import { createPool, VercelPool } from '@vercel/postgres'
+
+// Different Postgres integrations expose the connection string under different
+// names (Vercel Postgres uses POSTGRES_URL; the native Neon integration often
+// uses DATABASE_URL). Resolve whichever is present so a connected database
+// always works regardless of which integration created it.
+const connectionString =
+  process.env.POSTGRES_URL ||
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.DATABASE_URL_UNPOOLED ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.NEON_DATABASE_URL
+
+const pool = createPool(connectionString ? { connectionString } : undefined)
+
+// Re-export the pool's tagged-template `sql` so existing `sql<Row>\`...\`` call
+// sites keep working while we control which connection string the pool uses.
+export const sql: VercelPool['sql'] = pool.sql.bind(pool)
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -66,5 +84,3 @@ export function ensureSchema(): Promise<void> {
   }
   return schemaReady
 }
-
-export { sql }
