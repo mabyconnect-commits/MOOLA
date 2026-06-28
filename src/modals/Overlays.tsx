@@ -63,23 +63,33 @@ export default function Overlays({ v }: { v: MoolaVals }) {
 
       {/* ===== AIRDROP CLAIM ===== */}
       {v.claim && (
-        <div onClick={v.closeClaim} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.7);display:flex;justify-content:center;align-items:center;padding:20px')}>
-          <div onClick={v.stop} style={css('width:380px;max-width:100%;border-radius:22px;background:linear-gradient(180deg,#123322,#0a1d14);border:1px solid rgba(110,200,150,.25);padding:24px 20px;animation:pop .3s ease;text-align:center')}>
-            <div style={css('font-size:46px;animation:floaty 3s ease-in-out infinite')}>🎁</div>
-            <div style={css('font-size:22px;font-weight:800;margin:8px 0 2px')}>Claim your Airdrop</div>
-            <div style={css('font-size:30px;font-weight:800;color:#23d39a;margin-bottom:4px')}>200 $MOOLA <span style={css('font-size:15px;color:#92b8a3;font-weight:600')}>≈ $2</span></div>
-            <div style={css('font-size:13px;color:#92b8a3;line-height:1.55;margin-bottom:18px')}>Your airdrop auto-stakes on claim and starts earning <b style={css('color:#cfe7da')}>2.05% daily</b> instantly.</div>
-            {v.claimStep1 && (
-              <div onClick={v.claimAirdrop} style={css('padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:16px;cursor:pointer')}>Claim &amp; Stake</div>
-            )}
-            {v.claimStep2 && (
-              <>
-                <div style={css('font-size:13px;color:#92b8a3;text-align:left;margin-bottom:7px')}>Your Solana address</div>
-                <input value={v.claimAddr} onChange={v.onClaimAddr} placeholder="Paste SOL address" style={css('width:100%;box-sizing:border-box;padding:13px 14px;border-radius:13px;background:rgba(6,22,14,.6);border:1px solid rgba(110,200,150,.22);color:#eafff4;font-size:14px;outline:none;font-family:Sora,sans-serif;margin-bottom:13px')} />
-                <div onClick={v.confirmClaim} style={css('padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:16px;cursor:pointer')}>Confirm Claim</div>
-              </>
-            )}
-            <div onClick={v.closeClaim} style={css('margin-top:12px;font-size:13px;color:#7ea98f;cursor:pointer')}>Maybe later</div>
+        <div onClick={v.closeClaim} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.74);display:flex;justify-content:center;align-items:center;padding:20px')}>
+          <div onClick={v.stop} style={css('position:relative;width:380px;max-width:100%')}>
+            {/* pulsing glow halo behind the card */}
+            <div style={css('position:absolute;inset:-26px;border-radius:42px;background:radial-gradient(circle,rgba(35,211,154,.5),rgba(242,179,78,.18) 55%,transparent 72%);filter:blur(24px);animation:pulseGlow 2.4s ease-in-out infinite;pointer-events:none')}></div>
+            <div style={css('position:relative;border-radius:22px;background:linear-gradient(180deg,#123322,#0a1d14);border:1px solid rgba(150,255,235,.3);padding:24px 20px;text-align:center;animation:pop .3s ease, claimGlow 2.4s ease-in-out infinite')}>
+              {/* attention pill */}
+              <div style={css('display:inline-block;padding:5px 14px;border-radius:14px;background:rgba(242,179,78,.16);border:1px solid rgba(242,179,78,.4);color:#f2b34e;font-size:11.5px;font-weight:800;letter-spacing:1.5px;margin-bottom:12px;animation:pulseGlow 1.8s ease-in-out infinite')}>✨ FREE AIRDROP</div>
+              {/* gift with glowing aura */}
+              <div style={css('position:relative;display:flex;justify-content:center;align-items:center;margin-bottom:2px')}>
+                <div style={css('position:absolute;width:96px;height:96px;border-radius:50%;background:radial-gradient(circle,rgba(35,211,154,.55),transparent 70%);filter:blur(8px);animation:pulseGlow 2s ease-in-out infinite;pointer-events:none')}></div>
+                <div style={css('position:relative;font-size:52px;animation:floaty 3s ease-in-out infinite')}>🎁</div>
+              </div>
+              <div style={css('font-size:22px;font-weight:800;margin:6px 0 2px')}>Claim your Airdrop</div>
+              <div style={css('font-size:32px;font-weight:800;color:#23d39a;margin-bottom:4px')}>200 $MOOLA <span style={css('font-size:15px;color:#92b8a3;font-weight:600')}>≈ $2</span></div>
+              <div style={css('font-size:13px;color:#92b8a3;line-height:1.55;margin-bottom:18px')}>Your airdrop auto-stakes on claim and starts earning <b style={css('color:#cfe7da')}>2.05% daily</b> instantly.</div>
+              {v.claimStep1 && (
+                <div onClick={v.claimAirdrop} style={css('padding:16px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:16px;cursor:pointer;animation:btnGlow 1.8s ease-in-out infinite')}>🎁 Claim &amp; Stake</div>
+              )}
+              {v.claimStep2 && (
+                <>
+                  <div style={css('font-size:13px;color:#92b8a3;text-align:left;margin-bottom:7px')}>Your Solana address</div>
+                  <input value={v.claimAddr} onChange={v.onClaimAddr} placeholder="Paste SOL address" style={css('width:100%;box-sizing:border-box;padding:13px 14px;border-radius:13px;background:rgba(6,22,14,.6);border:1px solid rgba(110,200,150,.22);color:#eafff4;font-size:14px;outline:none;font-family:Sora,sans-serif;margin-bottom:13px')} />
+                  <div onClick={v.confirmClaim} style={css('padding:16px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:16px;cursor:pointer;animation:btnGlow 1.8s ease-in-out infinite')}>Confirm Claim</div>
+                </>
+              )}
+              <div onClick={v.closeClaim} style={css('margin-top:12px;font-size:13px;color:#7ea98f;cursor:pointer')}>Maybe later</div>
+            </div>
           </div>
         </div>
       )}

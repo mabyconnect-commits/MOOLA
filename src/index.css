@@ -62,3 +62,32 @@ input::placeholder {
     opacity: 1;
   }
 }
+@keyframes claimGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(110, 200, 150, 0.25),
+      0 0 30px rgba(35, 211, 154, 0.28),
+      0 0 60px rgba(242, 179, 78, 0.16);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(150, 255, 235, 0.55),
+      0 0 55px rgba(35, 211, 154, 0.6),
+      0 0 95px rgba(242, 179, 78, 0.34);
+  }
+}
+@keyframes btnGlow {
+  0%,
+  100% {
+    box-shadow: 0 6px 18px rgba(35, 211, 154, 0.4);
+  }
+  50% {
+    box-shadow: 0 8px 30px rgba(35, 211, 154, 0.85);
+  }
+}
+@keyframes spinGlow {
+  to {
+    transform: rotate(360deg);
+  }
+}
