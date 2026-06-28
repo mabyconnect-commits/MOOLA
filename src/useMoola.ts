@@ -254,6 +254,16 @@ export function useMoola() {
         applyAccount(r.account, r.txns)
         applyReferral(r.referral)
         set({ authed: true, screen: 'home', booting: false })
+        // Warm the deterministic deposit address in the background so the
+        // deposit sheet opens instantly (and never re-generates it).
+        api
+          .action('deposit-address', {})
+          .then((d) => {
+            if (!cancelled && d.address) set({ depAddress: d.address })
+          })
+          .catch(() => {
+            /* deposit system not configured / offline — ignore */
+          })
       })
       .catch(() => {
         if (cancelled) return
@@ -441,8 +451,10 @@ export function useMoola() {
   }
 
   const openDeposit = (asset: 'SOL' | 'USDT' | 'USDC') => {
-    set({ deposit: true, depositAsset: asset, depositAmt: '', wallet: false, depAddress: '' })
-    // Fetch this user's unique on-chain deposit address.
+    // The deposit address is deterministic per account, so reuse the cached
+    // one (set on hydration) and only fetch if we don't have it yet.
+    set({ deposit: true, depositAsset: asset, depositAmt: '', wallet: false })
+    if (stateRef.current.depAddress) return
     api
       .action('deposit-address', {})
       .then((r) => {
