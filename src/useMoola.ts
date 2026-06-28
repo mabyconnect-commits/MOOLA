@@ -654,7 +654,10 @@ export function useMoola() {
     // modal open/close
     openWallet: () => set({ wallet: true }),
     closeWallet: () => set({ wallet: false }),
-    openClaim: () => set({ claim: true, claimStep: 1 }),
+    openClaim: () =>
+      stateRef.current.airdropClaimed
+        ? flash('Airdrop already claimed ✓')
+        : set({ claim: true, claimStep: 1 }),
     closeClaim: () => set({ claim: false, claimStep: 1 }),
     openStakeForm: () => set({ stakeForm: true, wallet: false }),
     closeStakeForm: () => set({ stakeForm: false }),

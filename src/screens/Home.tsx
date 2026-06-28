@@ -26,7 +26,11 @@ export default function Home({ v }: { v: MoolaVals }) {
           <div style={css('font-size:12px;color:#92b8a3')}>Airdrop &amp; Stake · ≈ $2</div>
           <div style={css('font-size:19px;font-weight:700')}>{v.airdropAmt} $MOOLA</div>
         </div>
-        <div onClick={v.openClaim} style={css('padding:9px 22px;border-radius:20px;background:linear-gradient(120deg,#23d39a,#16c07e);color:#062018;font-weight:800;font-size:14px;cursor:pointer;animation:claimPulse 1.5s ease-in-out infinite')}>Claim</div>
+        {v.airdropClaimed ? (
+          <div style={css('padding:9px 20px;border-radius:20px;background:rgba(35,211,154,.14);border:1px solid rgba(35,211,154,.35);color:#23d39a;font-weight:800;font-size:14px;cursor:default')}>✓ Claimed</div>
+        ) : (
+          <div onClick={v.openClaim} style={css('padding:9px 22px;border-radius:20px;background:linear-gradient(120deg,#23d39a,#16c07e);color:#062018;font-weight:800;font-size:14px;cursor:pointer;animation:claimPulse 1.5s ease-in-out infinite')}>Claim</div>
+        )}
       </div>
 
       {/* telegram banner */}
@@ -36,7 +40,11 @@ export default function Home({ v }: { v: MoolaVals }) {
           <div style={css('font-size:12px;color:#92b8a3')}>$MOOLA Community</div>
           <div style={css('font-size:17px;font-weight:700')}>Telegram Channel</div>
         </div>
-        <div onClick={v.joinTelegram} style={css('padding:9px 22px;border-radius:20px;border:1px solid #23d39a;color:#23d39a;font-weight:600;font-size:14px;cursor:pointer')}>Join</div>
+        {v.joinedTg ? (
+          <div style={css('padding:9px 20px;border-radius:20px;background:rgba(35,211,154,.14);border:1px solid rgba(35,211,154,.35);color:#23d39a;font-weight:700;font-size:14px;cursor:default')}>✓ Joined</div>
+        ) : (
+          <div onClick={v.joinTelegram} style={css('padding:9px 22px;border-radius:20px;border:1px solid #23d39a;color:#23d39a;font-weight:600;font-size:14px;cursor:pointer')}>Join</div>
+        )}
       </div>
 
       {/* 100x hero: write-up ON TOP, calf below and fully visible */}
@@ -61,7 +69,11 @@ export default function Home({ v }: { v: MoolaVals }) {
       {/* CTA buttons */}
       <div style={css('display:flex;gap:11px;margin:4px 0 30px')}>
         <div onClick={v.goPresale} style={css('flex:1;text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#16c07e);color:#06160e;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 6px 20px rgba(35,211,154,.32)')}>Buy Presale</div>
-        <div onClick={v.openClaim} style={css('flex:1;text-align:center;padding:15px;border-radius:14px;border:1px solid rgba(110,200,150,.35);color:#cfe7da;font-weight:700;font-size:15px;cursor:pointer')}>Claim Airdrop</div>
+        {v.airdropClaimed ? (
+          <div style={css('flex:1;text-align:center;padding:15px;border-radius:14px;border:1px solid rgba(35,211,154,.35);background:rgba(35,211,154,.1);color:#23d39a;font-weight:800;font-size:15px;cursor:default')}>✓ Claimed</div>
+        ) : (
+          <div onClick={v.openClaim} style={css('flex:1;text-align:center;padding:15px;border-radius:14px;border:1px solid rgba(110,200,150,.35);color:#cfe7da;font-weight:700;font-size:15px;cursor:pointer')}>Claim Airdrop</div>
+        )}
       </div>
 
       {/* live stats strip */}
