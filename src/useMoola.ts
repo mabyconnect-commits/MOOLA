@@ -59,6 +59,7 @@ interface MoolaState {
   confirm: string
   code: string
   demoCode: string
+  showPw: boolean
   txns: ApiTxn[]
 }
 
@@ -111,6 +112,7 @@ const initialState: MoolaState = {
   confirm: '',
   code: '',
   demoCode: '',
+  showPw: false,
   txns: [],
 }
 
@@ -490,6 +492,10 @@ export function useMoola() {
     confirm: s.confirm,
     code: s.code,
     demoCode: s.demoCode,
+    showPw: s.showPw,
+    pwType: s.showPw ? 'text' : 'password',
+    pwEye: s.showPw ? '🙈' : '👁️',
+    toggleShowPw: () => set((st) => ({ showPw: !st.showPw })),
     onEmail: onInput('email'),
     onPassword: onInput('password'),
     onConfirm: onInput('confirm'),
