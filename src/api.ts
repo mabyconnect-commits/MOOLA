@@ -69,6 +69,8 @@ export interface AccountResponse {
   needsDeposit?: boolean
   depositAsset?: 'SOL' | 'USDT' | 'USDC'
   depositAmt?: string
+  address?: string
+  found?: boolean
 }
 
 export interface AuthChallenge {

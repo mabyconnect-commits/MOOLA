@@ -38,6 +38,8 @@ interface MoolaState {
   deposit: boolean
   depositAsset: 'SOL' | 'USDT' | 'USDC'
   depositAmt: string
+  depAddress: string
+  depChecking: boolean
   depCopied: boolean
   sell: boolean
   sellAmt: string
@@ -96,6 +98,8 @@ const initialState: MoolaState = {
   deposit: false,
   depositAsset: 'USDT',
   depositAmt: '',
+  depAddress: '',
+  depChecking: false,
   depCopied: false,
   sell: false,
   sellAmt: '',
@@ -436,20 +440,35 @@ export function useMoola() {
     }
   }
 
-  const openDeposit = (asset: 'SOL' | 'USDT' | 'USDC') =>
-    set({ deposit: true, depositAsset: asset, depositAmt: '', wallet: false })
+  const openDeposit = (asset: 'SOL' | 'USDT' | 'USDC') => {
+    set({ deposit: true, depositAsset: asset, depositAmt: '', wallet: false, depAddress: '' })
+    // Fetch this user's unique on-chain deposit address.
+    api
+      .action('deposit-address', {})
+      .then((r) => {
+        if (r.address) set({ depAddress: r.address })
+      })
+      .catch((e) => flash(errMsg(e)))
+  }
 
+  // After the user sends funds, ask the server to check the chain and credit
+  // anything new. Real crediting is on-chain, so the typed amount is just a hint.
   const confirmDeposit = async () => {
-    const amt = parseFloat(stateRef.current.depositAmt) || 0
-    if (amt <= 0) return flash('Enter the amount you sent')
-    const asset = stateRef.current.depositAsset
+    if (stateRef.current.depChecking) return
+    set({ depChecking: true })
     try {
-      const r = await api.action('deposit', { amount: amt, asset })
-      applyAccount(r.account, r.txns)
-      set({ deposit: false, depositAmt: '' })
-      flash('✅ ' + fmt(amt, asset === 'SOL' ? 4 : 2) + ' ' + asset + ' credited to your wallet')
+      const r = await api.action('deposit-check', {})
+      if (r.account) applyAccount(r.account, r.txns)
+      if (r.found) {
+        set({ deposit: false, depositAmt: '' })
+        flash('✅ Deposit detected and credited!')
+      } else {
+        flash('No deposit detected yet — wait ~30s after sending, then check again.')
+      }
     } catch (e) {
       flash(errMsg(e))
+    } finally {
+      set({ depChecking: false })
     }
   }
 
@@ -662,7 +681,9 @@ export function useMoola() {
     deposit: s.deposit,
     depositAsset: s.depositAsset,
     depositAmt: s.depositAmt,
-    depAddr: 'So1aMooLaPreSa1e9xKqTbD7vRt4Z8aE2nWyMoo9aE2',
+    depAddr: s.depAddress || 'Generating your address…',
+    depReady: !!s.depAddress,
+    depChecking: s.depChecking,
     depTokensStr:
       s.depositAsset !== 'SOL' && parseFloat(s.depositAmt) > 0
         ? fmt(Math.floor(parseFloat(s.depositAmt) / 0.01), 0)
@@ -673,6 +694,11 @@ export function useMoola() {
     closeDeposit: () => set({ deposit: false }),
     confirmDeposit,
     copyDepAddr: () => {
+      try {
+        if (stateRef.current.depAddress) navigator.clipboard?.writeText(stateRef.current.depAddress)
+      } catch {
+        /* clipboard may be unavailable */
+      }
       set({ depCopied: true })
       flash('Address copied')
       setTimeout(() => set({ depCopied: false }), 1500)

@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { ensureSchema } from '../_lib/db.js'
+import { ensureSchema, getDepositIndex, getDepCredited, sql } from '../_lib/db.js'
 import { SOLANA_ADDR_RE, userIdFromReq } from '../_lib/auth.js'
 import { distributeCommission } from '../_lib/referral.js'
+import { depositConfigured, depositAddress, readBalances } from '../_lib/solana.js'
 import {
   AIRDROP_AMOUNT,
   PRESALE_PRICE,
@@ -121,6 +122,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // NOTE: this records a deposit against the account. It does not move real
       // funds on-chain — settlement is intentionally out of scope for launch.
       case 'deposit': {
+        // Simulated credit — ONLY allowed when the on-chain deposit system
+        // isn't configured (local/dev). In production this is disabled so
+        // nobody can credit themselves free balance.
+        if (depositConfigured()) {
+          return res.status(400).json({ error: 'Use the deposit address — funds are credited on-chain.' })
+        }
         const amt = Number(body.amount)
         const asset: Asset = body.asset === 'SOL' ? 'SOL' : body.asset === 'USDC' ? 'USDC' : 'USDT'
         if (!amt || amt <= 0) return res.status(400).json({ error: 'Enter the amount you sent' })
@@ -131,6 +138,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const dec = asset === 'SOL' ? 4 : 2
         await addTxn(userId, { icon: '⬇️', title: 'Deposit', sub: asset, amt: `+${fmt(amt, dec)} ${asset}`, pos: true })
         break
+      }
+
+      // ---- REAL DEPOSIT: return the user's unique on-chain address --------
+      case 'deposit-address': {
+        if (!depositConfigured()) return res.status(503).json({ error: 'Deposit system not configured' })
+        const index = await getDepositIndex(userId)
+        return res.status(200).json({ address: depositAddress(index) })
+      }
+
+      // ---- REAL DEPOSIT: detect on-chain deposits and credit anything new -
+      case 'deposit-check': {
+        if (!depositConfigured()) return res.status(503).json({ error: 'Deposit system not configured' })
+        const index = await getDepositIndex(userId)
+        const onchain = await readBalances(index)
+        const seen = await getDepCredited(userId)
+        const newSol = Math.max(0, onchain.sol - seen.dep_sol)
+        const newUsdt = Math.max(0, onchain.usdt - seen.dep_usdt)
+        const newUsdc = Math.max(0, onchain.usdc - seen.dep_usdc)
+        if (newSol > 0 || newUsdt > 0 || newUsdc > 0) {
+          a.sol += newSol
+          a.usdt += newUsdt
+          a.usdc += newUsdc
+          await saveAccount(userId, a)
+          await sql`UPDATE accounts SET dep_sol = ${onchain.sol}, dep_usdt = ${onchain.usdt}, dep_usdc = ${onchain.usdc} WHERE user_id = ${userId}`
+          if (newSol > 0) await addTxn(userId, { icon: '⬇️', title: 'SOL deposit', sub: 'Solana', amt: `+${fmt(newSol, 4)} SOL`, pos: true })
+          if (newUsdt > 0) await addTxn(userId, { icon: '⬇️', title: 'USDT deposit', sub: 'Solana (SPL)', amt: `+${fmt(newUsdt, 2)} USDT`, pos: true })
+          if (newUsdc > 0) await addTxn(userId, { icon: '⬇️', title: 'USDC deposit', sub: 'Solana (SPL)', amt: `+${fmt(newUsdc, 2)} USDC`, pos: true })
+        }
+        const account = await loadAccount(userId)
+        const txns = await loadTxns(userId)
+        return res.status(200).json({ account, txns, found: newSol > 0 || newUsdt > 0 || newUsdc > 0 })
       }
 
       // ---- SELL -----------------------------------------------------------

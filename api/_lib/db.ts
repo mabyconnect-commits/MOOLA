@@ -111,6 +111,14 @@ export function ensureSchema(): Promise<void> {
         )
       `
       await sql`CREATE INDEX IF NOT EXISTS ref_earn_beneficiary_idx ON referral_earnings(beneficiary)`
+
+      // ---- On-chain deposit columns (idempotent migrations) ----
+      // deposit_index: per-user HD index for their unique deposit address.
+      // dep_*: cumulative on-chain amount already credited (prevents double-credit).
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deposit_index INTEGER`
+      await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_sol DOUBLE PRECISION NOT NULL DEFAULT 0`
+      await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_usdt DOUBLE PRECISION NOT NULL DEFAULT 0`
+      await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_usdc DOUBLE PRECISION NOT NULL DEFAULT 0`
     })().catch((e) => {
       // Reset so a later request can retry schema creation.
       schemaReady = null
@@ -118,4 +126,24 @@ export function ensureSchema(): Promise<void> {
     })
   }
   return schemaReady
+}
+
+/** Assign (once) and return a user's deposit-address HD index. Index 0 reserved. */
+export async function getDepositIndex(userId: number): Promise<number> {
+  const { rows } = await sql<{ deposit_index: number | null }>`
+    SELECT deposit_index FROM users WHERE id = ${userId}`
+  if (rows[0]?.deposit_index != null) return rows[0].deposit_index
+  const max = await sql<{ m: number }>`SELECT COALESCE(MAX(deposit_index), 0) AS m FROM users`
+  const next = Number(max.rows[0].m) + 1
+  await sql`UPDATE users SET deposit_index = ${next} WHERE id = ${userId}`
+  return next
+}
+
+/** Read the cumulative already-credited deposit amounts for an account. */
+export async function getDepCredited(
+  userId: number,
+): Promise<{ dep_sol: number; dep_usdt: number; dep_usdc: number }> {
+  const { rows } = await sql<{ dep_sol: number; dep_usdt: number; dep_usdc: number }>`
+    SELECT dep_sol, dep_usdt, dep_usdc FROM accounts WHERE user_id = ${userId}`
+  return rows[0] || { dep_sol: 0, dep_usdt: 0, dep_usdc: 0 }
 }

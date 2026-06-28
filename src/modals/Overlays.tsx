@@ -259,7 +259,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               Waiting for your deposit…
             </div>
 
-            <div onClick={v.confirmDeposit} style={css('text-align:center;padding:16px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#16c07e);color:#06160e;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 6px 20px rgba(35,211,154,.32)')}>I've sent the payment</div>
+            <div onClick={v.confirmDeposit} style={css('text-align:center;padding:16px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#16c07e);color:#06160e;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 6px 20px rgba(35,211,154,.32)')}>{v.depChecking ? 'Checking the chain…' : "I've sent it — check for deposit"}</div>
             <div onClick={v.closeDeposit} style={css('text-align:center;font-size:13px;color:#7ea98f;margin-top:13px;cursor:pointer')}>Cancel</div>
           </div>
         </div>
