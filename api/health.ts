@@ -18,6 +18,23 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     MOOLA_EMAIL_FROM: !!process.env.MOOLA_EMAIL_FROM,
   }
 
+  // Deposit / treasury-sweep configuration (booleans only).
+  const rpc = !!process.env.SOLANA_RPC_URL
+  const masterSeed = !!process.env.MASTER_SEED
+  const treasuryAddr = !!process.env.TREASURY_ADDRESS
+  const treasurySecret = !!process.env.TREASURY_SECRET
+  const solana = {
+    SOLANA_RPC_URL: rpc,
+    MASTER_SEED: masterSeed,
+    TREASURY_ADDRESS: treasuryAddr,
+    TREASURY_SECRET: treasurySecret,
+    USDC_MINT: !!process.env.USDC_MINT,
+    USDT_MINT: !!process.env.USDT_MINT,
+    // What each capability needs:
+    depositReady: rpc && masterSeed && treasuryAddr, // detect + credit deposits
+    sweepReady: rpc && treasuryAddr && treasurySecret, // auto-sweep to treasury
+  }
+
   let db: { ok: boolean; error?: string }
   try {
     const r = await sql<{ ok: number }>`SELECT 1 AS ok`
@@ -26,5 +43,5 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     db = { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 
-  res.status(200).json({ ok: true, node: process.version, env, db })
+  res.status(200).json({ ok: true, node: process.version, env, solana, db })
 }
