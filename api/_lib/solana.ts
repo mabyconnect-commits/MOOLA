@@ -6,24 +6,19 @@ import {
   Transaction,
   sendAndConfirmTransaction,
 } from '@solana/web3.js'
-import {
-  getAssociatedTokenAddress,
-  getAccount,
-  getOrCreateAssociatedTokenAccount,
-  createTransferCheckedInstruction,
-} from '@solana/spl-token'
 import { mnemonicToSeedSync } from 'bip39'
 import { derivePath } from 'ed25519-hd-key'
-import bs58 from 'bs58'
+
+// NOTE: @solana/spl-token and bs58 are imported lazily (inside the functions
+// that use them) so deposit-address generation depends only on web3.js + the
+// HD-derivation libs. A load failure in those heavier packages can then only
+// affect token detection / payouts, never address generation.
 
 const RPC = process.env.SOLANA_RPC_URL || ''
 const MASTER = process.env.MASTER_SEED || ''
 const TREASURY = process.env.TREASURY_ADDRESS || ''
 const TREASURY_SECRET = process.env.TREASURY_SECRET || ''
 
-// Stablecoin mints. On devnet, set USDC_MINT / USDT_MINT in env to your test
-// mints. Defaults are Solana mainnet USDC/USDT. Parsed lazily so a bad/empty
-// env value surfaces as a handled error instead of crashing module load.
 const DEFAULT_USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 const DEFAULT_USDT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
 function usdcMint(): PublicKey {
@@ -33,7 +28,6 @@ function usdtMint(): PublicKey {
   return new PublicKey((process.env.USDT_MINT || DEFAULT_USDT).trim())
 }
 const TOKEN_DECIMALS = 6 // USDT & USDC
-const SOL_DECIMALS = 9
 const LAMPORTS = 1e9
 
 export type Asset = 'SOL' | 'USDT' | 'USDC'
@@ -59,27 +53,29 @@ function mintFor(asset: Exclude<Asset, 'SOL'>): PublicKey {
 /** Deterministic per-user deposit keypair: m/44'/501'/<index>'/0'. */
 export function depositKeypair(index: number): Keypair {
   if (!MASTER) throw new Error('MASTER_SEED not set')
-  const seed = mnemonicToSeedSync(MASTER)
+  const seed = mnemonicToSeedSync(MASTER.trim())
   const { key } = derivePath(`m/44'/501'/${index}'/0'`, seed.toString('hex'))
-  return Keypair.fromSeed(key)
+  return Keypair.fromSeed(Uint8Array.from(key))
 }
 export function depositAddress(index: number): string {
   return depositKeypair(index).publicKey.toBase58()
 }
 
 /** Treasury hot keypair (signs payouts/sweeps). Base58 secret from env. */
-export function treasuryKeypair(): Keypair {
+export async function treasuryKeypair(): Promise<Keypair> {
   if (!TREASURY_SECRET) throw new Error('TREASURY_SECRET not set')
-  return Keypair.fromSecretKey(bs58.decode(TREASURY_SECRET))
+  const bs58 = (await import('bs58')).default
+  return Keypair.fromSecretKey(bs58.decode(TREASURY_SECRET.trim()))
 }
 
 async function tokenBalance(conn: Connection, owner: PublicKey, mint: PublicKey): Promise<number> {
   try {
+    const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token')
     const ata = await getAssociatedTokenAddress(mint, owner)
     const acc = await getAccount(conn, ata)
     return Number(acc.amount) / 10 ** TOKEN_DECIMALS
   } catch {
-    return 0
+    return 0 // no token account yet => zero balance
   }
 }
 
@@ -98,7 +94,7 @@ export async function readBalances(index: number): Promise<{ sol: number; usdt: 
 /** Pay a user out from the treasury (used by withdrawals). Returns the tx sig. */
 export async function payout(to: string, asset: Asset, amount: number): Promise<string> {
   const conn = connection()
-  const treasury = treasuryKeypair()
+  const treasury = await treasuryKeypair()
   const dest = new PublicKey(to)
 
   if (asset === 'SOL') {
@@ -112,6 +108,8 @@ export async function payout(to: string, asset: Asset, amount: number): Promise<
     return sendAndConfirmTransaction(conn, tx, [treasury])
   }
 
+  const { getAssociatedTokenAddress, getOrCreateAssociatedTokenAccount, createTransferCheckedInstruction } =
+    await import('@solana/spl-token')
   const mint = mintFor(asset)
   const fromAta = await getAssociatedTokenAddress(mint, treasury.publicKey)
   const toAta = await getOrCreateAssociatedTokenAccount(conn, treasury, mint, dest)
@@ -127,5 +125,3 @@ export async function payout(to: string, asset: Asset, amount: number): Promise<
   )
   return sendAndConfirmTransaction(conn, tx, [treasury])
 }
-
-export const SOL_DECIMALS_EXPORT = SOL_DECIMALS

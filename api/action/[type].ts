@@ -217,7 +217,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ account, txns })
   } catch (e) {
     console.error('[moola] action error:', e)
-    return res.status(500).json({ error: 'Something went wrong. Please try again.' })
+    // Surface the real reason so deposit/chain misconfig is actionable instead
+    // of a mystery "Something went wrong".
+    const msg = e instanceof Error && e.message ? e.message : 'Something went wrong. Please try again.'
+    return res.status(500).json({ error: msg })
   }
 }
 

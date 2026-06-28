@@ -119,6 +119,21 @@ export function ensureSchema(): Promise<void> {
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_sol DOUBLE PRECISION NOT NULL DEFAULT 0`
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_usdt DOUBLE PRECISION NOT NULL DEFAULT 0`
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_usdc DOUBLE PRECISION NOT NULL DEFAULT 0`
+
+      // ---- One-time pre-launch test-data wipe ----
+      // Clears fake balances created by the old simulated deposit/buy. Runs
+      // exactly once (tracked in app_meta), automatically on deploy.
+      await sql`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, val TEXT)`
+      const reset = await sql<{ key: string }>`SELECT key FROM app_meta WHERE key = 'reset_testdata_v1'`
+      if (!reset.rows[0]) {
+        await sql`UPDATE accounts SET
+          balance=0, staked=0, available=0, reward=0, airdrop=0,
+          sol=0, usdt=0, usdc=0, minted=0, airdrop_claimed=false,
+          dep_sol=0, dep_usdt=0, dep_usdc=0, reward_updated_at=now()`
+        await sql`DELETE FROM transactions`
+        await sql`DELETE FROM referral_earnings`
+        await sql`INSERT INTO app_meta (key, val) VALUES ('reset_testdata_v1', 'done')`
+      }
     })().catch((e) => {
       // Reset so a later request can retry schema creation.
       schemaReady = null
