@@ -1,9 +1,8 @@
-import { createPool, VercelPool } from '@vercel/postgres'
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
 
-// Different Postgres integrations expose the connection string under different
-// names (Vercel Postgres uses POSTGRES_URL; the native Neon integration often
-// uses DATABASE_URL). Resolve whichever is present so a connected database
-// always works regardless of which integration created it.
+// Use Neon's native serverless driver (the integration Vercel now provisions
+// for Postgres). Resolve the connection string from whichever env var the
+// integration created — POSTGRES_URL, DATABASE_URL, or a Neon-specific name.
 const connectionString =
   process.env.POSTGRES_URL ||
   process.env.DATABASE_URL ||
@@ -12,11 +11,28 @@ const connectionString =
   process.env.POSTGRES_URL_NON_POOLING ||
   process.env.NEON_DATABASE_URL
 
-const pool = createPool(connectionString ? { connectionString } : undefined)
+// Create the query function lazily so a missing/invalid connection string
+// surfaces as a handled error at request time (JSON 500) rather than crashing
+// the serverless function at import time (which would hide the real cause).
+let _query: NeonQueryFunction<false, false> | null = null
+function query(): NeonQueryFunction<false, false> {
+  if (!_query) {
+    if (!connectionString) {
+      throw new Error('No Postgres connection string configured (set POSTGRES_URL or DATABASE_URL).')
+    }
+    _query = neon(connectionString)
+  }
+  return _query
+}
 
-// Re-export the pool's tagged-template `sql` so existing `sql<Row>\`...\`` call
-// sites keep working while we control which connection string the pool uses.
-export const sql: VercelPool['sql'] = pool.sql.bind(pool)
+// `sql\`...\`` returns { rows } to match the shape the rest of the code expects.
+export async function sql<O = Record<string, unknown>>(
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): Promise<{ rows: O[] }> {
+  const rows = (await query()(strings, ...values)) as O[]
+  return { rows }
+}
 
 // ---------------------------------------------------------------------------
 // Schema
