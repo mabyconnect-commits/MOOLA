@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { faqData, nfts as nftBase, refLevels, refRows, roadmap, txnsData, type Nft } from './data'
+import { faqData, nfts as nftBase, refLevels, refRows, roadmap, type Nft } from './data'
+import { api, clearToken, getToken, setToken, type Account, type ApiTxn } from './api'
 
 export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me'
 export type AuthView = 'welcome' | 'signup' | 'verify' | 'login'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 interface Orb {
   style: string
@@ -30,6 +33,7 @@ interface MoolaState {
   stakeAmt: string
   claimStep: number
   claimAddr: string
+  airdropClaimed: boolean
   faqOpen: number
   deposit: boolean
   depositAsset: 'SOL' | 'USDT' | 'USDC'
@@ -47,12 +51,15 @@ interface MoolaState {
   hideBal: boolean
   autoStake: boolean
   authed: boolean
+  booting: boolean
+  busy: boolean
   authView: AuthView
   email: string
   password: string
   confirm: string
   code: string
   demoCode: string
+  txns: ApiTxn[]
 }
 
 const initialState: MoolaState = {
@@ -78,6 +85,7 @@ const initialState: MoolaState = {
   stakeAmt: '',
   claimStep: 1,
   claimAddr: '',
+  airdropClaimed: false,
   faqOpen: 0,
   deposit: false,
   depositAsset: 'USDT',
@@ -95,16 +103,23 @@ const initialState: MoolaState = {
   hideBal: false,
   autoStake: true,
   authed: false,
+  booting: false,
+  busy: false,
   authView: 'welcome',
   email: '',
   password: '',
   confirm: '',
   code: '',
   demoCode: '',
+  txns: [],
 }
 
 function fmt(n: number, d: number): string {
   return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })
+}
+
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : 'Something went wrong'
 }
 
 function buildOrbs(): Orb[] {
@@ -142,12 +157,13 @@ function buildOrbs(): Orb[] {
   return orbs
 }
 
-function genCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000))
-}
-
 export function useMoola() {
-  const [s, setFull] = useState<MoolaState>(initialState)
+  const [s, setFull] = useState<MoolaState>(() => ({
+    ...initialState,
+    // If we already hold a session token, boot straight into a loading state
+    // and hydrate from the server rather than flashing the welcome screen.
+    booting: typeof window !== 'undefined' && !!getToken(),
+  }))
   const stateRef = useRef(s)
   stateRef.current = s
   const toastTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -158,7 +174,47 @@ export function useMoola() {
     setFull((prev) => ({ ...prev, ...(typeof patch === 'function' ? patch(prev) : patch) }))
   }
 
-  // live rewards ticker
+  // Merge a server account snapshot (and optionally history) into local state.
+  // The server is authoritative for every economic number.
+  const applyAccount = (acc: Account, txns?: ApiTxn[]) => {
+    set({
+      balance: acc.balance,
+      staked: acc.staked,
+      available: acc.available,
+      reward: acc.reward,
+      airdrop: acc.airdrop,
+      sol: acc.sol,
+      usdt: acc.usdt,
+      usdc: acc.usdc,
+      minted: acc.minted,
+      airdropClaimed: acc.airdropClaimed,
+      ...(txns ? { txns } : {}),
+    })
+  }
+
+  // Hydrate from the backend on first mount when a session exists.
+  useEffect(() => {
+    if (!getToken()) return
+    let cancelled = false
+    api
+      .account()
+      .then((r) => {
+        if (cancelled) return
+        applyAccount(r.account, r.txns)
+        set({ authed: true, screen: 'home', booting: false })
+      })
+      .catch(() => {
+        if (cancelled) return
+        clearToken()
+        set({ authed: false, booting: false })
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // live rewards ticker (cosmetic — reconciled with the server on every sync)
   useEffect(() => {
     const t = setInterval(() => {
       setFull((prev) => ({
@@ -189,164 +245,196 @@ export function useMoola() {
 
   // ---- auth ----
   const setAuth = (view: AuthView) => set({ authView: view, code: '' })
-  const doSignup = () => {
-    const { email, password, confirm } = stateRef.current
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      flash('Enter a valid email')
-      return
+
+  const doSignup = async () => {
+    const { email, password, confirm, busy } = stateRef.current
+    if (busy) return
+    if (!EMAIL_RE.test(email)) return flash('Enter a valid email')
+    if (password.length < 8) return flash('Password must be at least 8 characters')
+    if (password !== confirm) return flash('Passwords do not match')
+    set({ busy: true })
+    try {
+      const r = await api.signup(email, password)
+      set({ demoCode: r.devCode || '', authView: 'verify', code: '' })
+      flash(r.emailed ? '📧 Verification code sent to ' + email : '📧 Use the code shown below')
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ busy: false })
     }
-    if (password.length < 8) {
-      flash('Password must be at least 8 characters')
-      return
-    }
-    if (password !== confirm) {
-      flash('Passwords do not match')
-      return
-    }
-    const c = genCode()
-    set({ demoCode: c, authView: 'verify', code: '' })
-    flash('📧 Verification code sent to ' + email)
-  }
-  const doVerify = () => {
-    const cur = stateRef.current
-    if (cur.code.trim() !== cur.demoCode) {
-      flash('Incorrect code — try again')
-      return
-    }
-    // Verified → land on the Home page (Claim is one tap away via the banner).
-    set({ authed: true, password: '', confirm: '', code: '', screen: 'home', claim: false, claimStep: 1 })
-  }
-  const resendCode = () => {
-    set({ demoCode: genCode() })
-    flash('📧 New code sent')
-  }
-  const doLogin = () => {
-    const { email, password } = stateRef.current
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      flash('Enter a valid email')
-      return
-    }
-    if (password.length < 8) {
-      flash('Enter your password')
-      return
-    }
-    // Signed in → land on the Home page (Claim is one tap away via the banner).
-    set({ authed: true, password: '', screen: 'home', claim: false })
   }
 
-  // ---- economic actions ----
-  const doStake = () => {
+  const doVerify = async () => {
+    const cur = stateRef.current
+    if (cur.busy) return
+    if (cur.code.trim().length < 6) return flash('Enter the 6-digit code')
+    set({ busy: true })
+    try {
+      const r = await api.verify(cur.email, cur.code.trim())
+      if (r.token) setToken(r.token)
+      applyAccount(r.account, r.txns)
+      set({ authed: true, password: '', confirm: '', code: '', screen: 'home', claim: false, claimStep: 1, booting: false })
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ busy: false })
+    }
+  }
+
+  const resendCode = async () => {
+    try {
+      const r = await api.resend(stateRef.current.email)
+      set({ demoCode: r.devCode || '' })
+      flash(r.emailed ? '📧 New code sent' : '📧 New code shown below')
+    } catch (e) {
+      flash(errMsg(e))
+    }
+  }
+
+  const doLogin = async () => {
+    const { email, password, busy } = stateRef.current
+    if (busy) return
+    if (!EMAIL_RE.test(email)) return flash('Enter a valid email')
+    if (password.length < 8) return flash('Enter your password')
+    set({ busy: true })
+    try {
+      const r = await api.login(email, password)
+      if (r.token) setToken(r.token)
+      applyAccount(r.account, r.txns)
+      set({ authed: true, password: '', screen: 'home', claim: false, booting: false })
+    } catch (e) {
+      const data = (e as { data?: { needsVerify?: boolean; devCode?: string | null } }).data
+      if (data?.needsVerify) {
+        set({ demoCode: data.devCode || '', authView: 'verify', code: '', password: '' })
+        flash('Verify your email to continue')
+      } else {
+        flash(errMsg(e))
+      }
+    } finally {
+      set({ busy: false })
+    }
+  }
+
+  // ---- economic actions (server-backed) ----
+  const doStake = async () => {
     const amt = parseFloat(stateRef.current.stakeAmt)
-    if (!amt || amt <= 0) {
-      flash('Enter an amount to stake')
-      return
+    if (!amt || amt <= 0) return flash('Enter an amount to stake')
+    if (amt > stateRef.current.available) return flash('Insufficient available balance')
+    try {
+      const r = await api.action('stake', { amount: amt })
+      applyAccount(r.account, r.txns)
+      set({ stakeForm: false, stakeAmt: '' })
+      flash('Staked ' + fmt(amt, 3) + ' $MOOLA')
+    } catch (e) {
+      flash(errMsg(e))
     }
-    if (amt > stateRef.current.available) {
-      flash('Insufficient available balance')
-      return
-    }
-    set((p) => ({ staked: p.staked + amt, available: p.available - amt, stakeForm: false, stakeAmt: '' }))
-    flash('Staked ' + fmt(amt, 3) + ' $MOOLA')
   }
-  const claimRewards = () => {
-    const r = stateRef.current.reward
-    if (r <= 0) {
-      flash('No rewards to claim yet')
-      return
+
+  const claimRewards = async () => {
+    const r0 = stateRef.current.reward
+    if (r0 <= 0) return flash('No rewards to claim yet')
+    try {
+      const r = await api.action('claim-rewards', {})
+      applyAccount(r.account, r.txns)
+      set({ rewards: false })
+      flash('✅ Claimed ' + fmt(r0, 4) + ' $MOOLA to your wallet')
+    } catch (e) {
+      flash(errMsg(e))
     }
-    set((p) => ({ available: p.available + r, balance: p.balance + r, reward: 0, rewards: false }))
-    flash('✅ Claimed ' + fmt(r, 4) + ' $MOOLA to your wallet')
   }
-  const compoundRewards = () => {
-    const r = stateRef.current.reward
-    if (r <= 0) {
-      flash('No rewards to compound yet')
-      return
+
+  const compoundRewards = async () => {
+    const r0 = stateRef.current.reward
+    if (r0 <= 0) return flash('No rewards to compound yet')
+    try {
+      const r = await api.action('compound', {})
+      applyAccount(r.account, r.txns)
+      set({ rewards: false })
+      flash('🔁 Compounded ' + fmt(r0, 4) + ' $MOOLA into your stake')
+    } catch (e) {
+      flash(errMsg(e))
     }
-    set((p) => ({ staked: p.staked + r, balance: p.balance + r, reward: 0, rewards: false }))
-    flash('🔁 Compounded ' + fmt(r, 4) + ' $MOOLA into your stake')
   }
-  // Presale is paid in a Solana (SPL) stablecoin — USDT or USDC. If the user
-  // already holds enough of the chosen coin, buy immediately; otherwise route
-  // them to deposit it.
-  const doBuy = () => {
+
+  // Presale is paid in a Solana (SPL) stablecoin — USDT or USDC. The server
+  // either completes the buy or, when the user is short on that coin, tells us
+  // to route them to deposit the difference.
+  const doBuy = async () => {
     const amt = parseFloat(stateRef.current.solIn)
-    if (!amt || amt <= 0) {
-      flash('Enter a USDT / USDC amount')
-      return
-    }
+    if (!amt || amt <= 0) return flash('Enter a USDT / USDC amount')
     const ccy = stateRef.current.payCcy
-    const bal = ccy === 'USDT' ? stateRef.current.usdt : stateRef.current.usdc
-    if (bal >= amt) {
-      const tokens = Math.floor(amt / 0.01) // $0.01 per $MOOLA, stablecoin ≈ $1
-      set((p) =>
-        ccy === 'USDT'
-          ? { usdt: p.usdt - amt, balance: p.balance + tokens, available: p.available + tokens, solIn: '' }
-          : { usdc: p.usdc - amt, balance: p.balance + tokens, available: p.available + tokens, solIn: '' },
-      )
+    try {
+      const r = await api.action('buy', { amount: amt, ccy })
+      applyAccount(r.account, r.txns)
+      if (r.needsDeposit) {
+        set({ deposit: true, depositAsset: r.depositAsset || ccy, depositAmt: r.depositAmt || '' })
+        flash('Deposit ' + ccy + ' on Solana to continue')
+        return
+      }
+      const tokens = Math.floor(amt / 0.01)
+      set({ solIn: '' })
       flash('✅ Bought ' + fmt(tokens, 0) + ' $MOOLA with ' + fmt(amt, 2) + ' ' + ccy)
-    } else {
-      const needed = amt - bal
-      set({ deposit: true, depositAsset: ccy, depositAmt: needed.toFixed(2) })
-      flash('Deposit ' + ccy + ' on Solana to continue')
+    } catch (e) {
+      flash(errMsg(e))
     }
   }
+
   const openDeposit = (asset: 'SOL' | 'USDT' | 'USDC') =>
     set({ deposit: true, depositAsset: asset, depositAmt: '', wallet: false })
-  const confirmDeposit = () => {
+
+  const confirmDeposit = async () => {
     const amt = parseFloat(stateRef.current.depositAmt) || 0
-    if (amt <= 0) {
-      flash('Enter the amount you sent')
-      return
-    }
+    if (amt <= 0) return flash('Enter the amount you sent')
     const asset = stateRef.current.depositAsset
-    set((p) =>
-      asset === 'SOL'
-        ? { sol: p.sol + amt, deposit: false, depositAmt: '' }
-        : asset === 'USDT'
-          ? { usdt: p.usdt + amt, deposit: false, depositAmt: '' }
-          : { usdc: p.usdc + amt, deposit: false, depositAmt: '' },
-    )
-    flash('✅ ' + fmt(amt, asset === 'SOL' ? 4 : 2) + ' ' + asset + ' credited to your wallet')
+    try {
+      const r = await api.action('deposit', { amount: amt, asset })
+      applyAccount(r.account, r.txns)
+      set({ deposit: false, depositAmt: '' })
+      flash('✅ ' + fmt(amt, asset === 'SOL' ? 4 : 2) + ' ' + asset + ' credited to your wallet')
+    } catch (e) {
+      flash(errMsg(e))
+    }
   }
-  const doMint = (n: Nft) => {
+
+  const doMint = async (n: Nft) => {
     const price = parseFloat(String(n.price).replace(/,/g, ''))
-    if (stateRef.current.available < price) {
-      flash('Need ' + n.price + ' $MOOLA to mint')
-      return
+    if (stateRef.current.available < price) return flash('Need ' + n.price + ' $MOOLA to mint')
+    try {
+      const r = await api.action('mint', { price, name: n.name })
+      applyAccount(r.account, r.txns)
+      flash('🐮 Minted ' + n.name + '!')
+    } catch (e) {
+      flash(errMsg(e))
     }
-    set((p) => ({ available: p.available - price, balance: p.balance - price, minted: p.minted + 1 }))
-    flash('🐮 Minted ' + n.name + '!')
   }
-  const doSell = () => {
+
+  const doSell = async () => {
     const amt = parseFloat(stateRef.current.sellAmt)
-    if (!amt || amt <= 0) {
-      flash('Enter an amount to sell')
-      return
+    if (!amt || amt <= 0) return flash('Enter an amount to sell')
+    if (amt > stateRef.current.available) return flash('Insufficient available balance')
+    try {
+      const r = await api.action('sell', { amount: amt })
+      applyAccount(r.account, r.txns)
+      set({ sell: false, sellAmt: '' })
+      flash('✅ Sold ' + fmt(amt, 0) + ' $MOOLA')
+    } catch (e) {
+      flash(errMsg(e))
     }
-    if (amt > stateRef.current.available) {
-      flash('Insufficient available balance')
-      return
-    }
-    const sol = (amt * 0.01) / 152
-    set((p) => ({ available: p.available - amt, balance: p.balance - amt, sol: p.sol + sol, sell: false, sellAmt: '' }))
-    flash('✅ Sold ' + fmt(amt, 0) + ' $MOOLA → ' + sol.toFixed(4) + ' SOL')
   }
+
   const claimAirdrop = () => set({ claimStep: 2 })
-  const confirmClaim = () => {
-    if (!stateRef.current.claimAddr || stateRef.current.claimAddr.length < 6) {
-      flash('Enter your Solana address')
-      return
+
+  const confirmClaim = async () => {
+    const addr = stateRef.current.claimAddr
+    if (!addr || addr.length < 6) return flash('Enter your Solana address')
+    try {
+      const r = await api.action('claim-airdrop', { claimAddr: addr })
+      applyAccount(r.account, r.txns)
+      set({ claim: false, claimStep: 1, claimAddr: '' })
+      flash('🎉 200 $MOOLA airdrop claimed & staked!')
+    } catch (e) {
+      flash(errMsg(e))
     }
-    set((p) => ({
-      airdrop: 200,
-      staked: p.staked + 200,
-      balance: p.balance + 200,
-      claim: false,
-      claimStep: 1,
-      claimAddr: '',
-    }))
-    flash('🎉 200 $MOOLA airdrop claimed & staked!')
   }
 
   const onInput =
@@ -373,6 +461,12 @@ export function useMoola() {
     setTimeout(() => set({ copyLabel: 'Copy' }), 1500)
   }
 
+  const logout = () => {
+    clearToken()
+    setFull({ ...initialState, booting: false })
+    flash('Signed out')
+  }
+
   const v = {
     // screen flags
     isHome: s.screen === 'home',
@@ -380,8 +474,10 @@ export function useMoola() {
     isPresale: s.screen === 'presale',
     isMe: s.screen === 'me',
     isNft: s.screen === 'nft',
-    // auth gate
-    showAuth: !s.authed,
+    // auth gate — stay hidden while we boot/hydrate an existing session
+    showAuth: !s.authed && !s.booting,
+    booting: s.booting,
+    busy: s.busy,
     authWelcome: s.authView === 'welcome',
     authSignup: s.authView === 'signup',
     authVerify: s.authView === 'verify',
@@ -412,13 +508,14 @@ export function useMoola() {
     faqs,
     refLevels,
     nfts: nftBase.map((n) => ({ ...n, mint: () => doMint(n) })),
-    txns: txnsData.map((t) => ({ ...t, amtColor: t.pos ? '#23d39a' : '#ff8f8f' })),
+    txns: s.txns.map((t) => ({ ...t, amtColor: t.pos ? '#23d39a' : '#ff8f8f' })),
     // modals
     wallet: s.wallet,
     claim: s.claim,
     stakeForm: s.stakeForm,
     claimStep1: s.claimStep === 1,
     claimStep2: s.claimStep === 2,
+    airdropClaimed: s.airdropClaimed,
     toast: s.toast,
     airdropAmt: 200,
     // formatted economics
@@ -549,7 +646,7 @@ export function useMoola() {
     toggleAuto: () => set((st) => ({ autoStake: !st.autoStake })),
     disconnect: () => {
       set({ settings: false })
-      flash('Wallet disconnected')
+      logout()
     },
   }
 
