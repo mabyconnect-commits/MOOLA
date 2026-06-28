@@ -10,13 +10,9 @@ export default function Auth({ v }: { v: MoolaVals }) {
 
       {v.authWelcome ? (
         /* ===== WELCOME — full-height splash ===== */
-        <div style={css('position:relative;min-height:100dvh;display:flex;flex-direction:column;justify-content:space-between;padding:26px 24px;text-align:center;animation:riseIn .45s ease')}>
-          {/* TOP: live badge + title */}
+        <div style={css('position:relative;min-height:100dvh;display:flex;flex-direction:column;justify-content:space-between;padding:48px 24px 28px;text-align:center;animation:riseIn .45s ease')}>
+          {/* TOP: title */}
           <div style={css('flex-shrink:0')}>
-            <div style={css('display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:16px;background:rgba(35,211,154,.12);border:1px solid rgba(35,211,154,.4);margin-bottom:16px;animation:pulseGlow 2.2s ease-in-out infinite')}>
-              <span style={css('width:7px;height:7px;border-radius:50%;background:#23d39a;box-shadow:0 0 8px #23d39a')}></span>
-              <span style={css('font-size:11.5px;font-weight:800;letter-spacing:1.5px;color:#9fffd9')}>AIRDROP IS LIVE</span>
-            </div>
             <div style={css('font-size:38px;font-weight:800;line-height:1.0;letter-spacing:.5px;text-transform:uppercase;text-shadow:0 0 34px rgba(35,211,154,.4)')}>
               <span style={css('color:#23d39a')}>$Moola</span>
               <br />
@@ -25,25 +21,21 @@ export default function Auth({ v }: { v: MoolaVals }) {
             <div style={css('font-size:14.5px;color:#bfe3d0;margin-top:11px;font-weight:500')}>The Best Web3.0 Community Token</div>
           </div>
 
-          {/* MIDDLE: hero + orb ring (+ free badge) */}
-          <div style={css('flex:1;min-height:0;display:flex;align-items:center;justify-content:center;margin:4px 0')}>
+          {/* MIDDLE: hero + orb ring (+ free badge), nudged down so it clears the subtitle */}
+          <div style={css('flex:1;min-height:0;display:flex;align-items:center;justify-content:center;margin:34px 0 8px')}>
             <div style={css('position:relative;width:100%;max-width:300px;margin:0 auto')}>
               {v.orbs.map((o, i) => (
                 <div key={i} style={css(o.style)}></div>
               ))}
               {/* free airdrop badge */}
-              <div style={css('position:absolute;top:-2px;right:2px;z-index:3;display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-size:11.5px;font-weight:800;box-shadow:0 6px 18px rgba(35,211,154,.5);animation:floaty 4s ease-in-out infinite')}>🎁 200 $MOOLA FREE</div>
+              <div style={css('position:absolute;top:10px;right:8px;z-index:3;display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-size:11.5px;font-weight:800;box-shadow:0 6px 18px rgba(35,211,154,.5);animation:floaty 4s ease-in-out infinite')}>🎁 200 $MOOLA FREE</div>
               <div style={css('position:absolute;left:50%;bottom:4px;transform:translateX(-50%);width:82%;height:30px;border-radius:50%;background:radial-gradient(ellipse,rgba(35,211,154,.5),transparent 70%);filter:blur(7px);pointer-events:none')}></div>
               <img src="assets/moola-hero-full.png" alt="Moola" style={css('position:relative;display:block;width:84%;max-width:280px;margin:0 auto;border-radius:24px;animation:floaty 6s ease-in-out infinite;filter:drop-shadow(0 0 32px rgba(35,211,154,.4))')} />
             </div>
           </div>
 
-          {/* BOTTOM: social proof + actions */}
+          {/* BOTTOM: actions */}
           <div style={css('flex-shrink:0')}>
-            <div style={css('display:flex;justify-content:center;gap:9px;margin-bottom:16px')}>
-              <div style={css('display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:14px;background:rgba(15,40,28,.6);border:1px solid rgba(110,200,150,.2);font-size:12.5px;color:#cfe7da;font-weight:600')}>🔥 18,420 holders</div>
-              <div style={css('display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:14px;background:rgba(15,40,28,.6);border:1px solid rgba(110,200,150,.2);font-size:12.5px;color:#cfe7da;font-weight:600')}>💰 $1.03M raised</div>
-            </div>
             <div onClick={v.goSignup} style={css('padding:17px;border-radius:18px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:800;font-size:16.5px;cursor:pointer;letter-spacing:.3px;animation:btnGlow 2.2s ease-in-out infinite')}>Claim Your Airdrop →</div>
             <div onClick={v.goLogin} style={css('margin-top:12px;padding:16px;border-radius:18px;background:rgba(35,211,154,.08);border:1.5px solid rgba(35,211,154,.45);color:#eafff4;font-weight:700;font-size:15.5px;cursor:pointer;letter-spacing:.3px')}>I already have an account</div>
             <div style={css('font-size:11.5px;color:#5e7d6a;margin-top:14px;line-height:1.5')}>By continuing you agree to Moola's Terms &amp; Privacy Policy.</div>
