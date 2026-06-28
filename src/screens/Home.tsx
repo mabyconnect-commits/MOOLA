@@ -26,7 +26,7 @@ export default function Home({ v }: { v: MoolaVals }) {
           <div style={css('font-size:12px;color:#92b8a3')}>Airdrop &amp; Stake · ≈ $2</div>
           <div style={css('font-size:19px;font-weight:700')}>{v.airdropAmt} $MOOLA</div>
         </div>
-        <div onClick={v.openClaim} style={css('padding:9px 20px;border-radius:20px;background:linear-gradient(120deg,#23d39a,#16c07e);color:#062018;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(47,227,194,.35)')}>Claim</div>
+        <div onClick={v.openClaim} style={css('padding:9px 22px;border-radius:20px;background:linear-gradient(120deg,#23d39a,#16c07e);color:#062018;font-weight:800;font-size:14px;cursor:pointer;animation:claimPulse 1.5s ease-in-out infinite')}>Claim</div>
       </div>
 
       {/* telegram banner */}

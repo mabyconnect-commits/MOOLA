@@ -51,18 +51,12 @@ export const refLevels: RefLevel[] = [
   { n: 10, pct: '0.1' },
 ]
 
-export const refRows: RefRow[] = [
-  { refs: '29', buy: '50,177', comm: '1,756.195' },
-  { refs: '4', buy: '4,861', comm: '87.498' },
-  { refs: '9', buy: '0', comm: '0.000' },
-  { refs: '2', buy: '0', comm: '0.000' },
-  { refs: '0', buy: '0', comm: '0' },
-  { refs: '0', buy: '0', comm: '0' },
-  { refs: '0', buy: '0', comm: '0' },
-  { refs: '0', buy: '0', comm: '0' },
-  { refs: '0', buy: '0', comm: '0' },
-  { refs: '0', buy: '0', comm: '0' },
-]
+// New users start with no referrals — these populate as people join.
+export const refRows: RefRow[] = Array.from({ length: 10 }, () => ({
+  refs: '0',
+  buy: '0',
+  comm: '0',
+}))
 
 export const nfts: Nft[] = [
   { name: 'Calf #001', tier: 'Genesis', price: '12,000', img: 'assets/m1.jpg' },
@@ -149,12 +143,5 @@ export const faqData: FaqItem[] = [
   },
 ]
 
-export const txnsData: Txn[] = [
-  { icon: '↓', title: 'Presale buy', sub: '2.5 SOL · 2 hrs ago', amt: '+38,000', pos: true },
-  { icon: '⊕', title: 'Staked $MOOLA', sub: 'Today, 09:14', amt: '+30,000', pos: true },
-  { icon: '🎁', title: 'Airdrop claimed', sub: 'Yesterday', amt: '+200', pos: true },
-  { icon: '💸', title: 'Referral commission', sub: 'L1 · Yesterday', amt: '+87.49', pos: true },
-  { icon: '↑', title: 'Sold to SOL', sub: '2 days ago', amt: '-12,500', pos: false },
-  { icon: '🐮', title: 'Minted Calf #014', sub: '3 days ago', amt: '-6,500', pos: false },
-  { icon: '↓', title: 'Presale buy', sub: '1.0 SOL · 4 days ago', amt: '+15,200', pos: true },
-]
+// Transaction history is empty for a new account — it fills as the user acts.
+export const txnsData: Txn[] = []

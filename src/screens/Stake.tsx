@@ -45,7 +45,7 @@ export default function Stake({ v }: { v: MoolaVals }) {
           <div style={css('font-size:12px;color:#92b8a3;margin-bottom:13px')}>Your Stake Cap <b style={css('color:#cfe7da')}>1,000,000</b> $MOOLA</div>
           <div style={css('display:flex;gap:11px;justify-content:center;margin-bottom:15px')}>
             <div onClick={v.openStakeForm} style={css('padding:11px 28px;border-radius:12px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 4px 14px rgba(47,227,194,.3)')}>⊕ Stake</div>
-            <div onClick={v.openRewards} style={css('padding:11px 28px;border-radius:12px;border:1px solid #23d39a;color:#23d39a;font-weight:600;font-size:15px;cursor:pointer')}>Details</div>
+            <div onClick={v.openDetails} style={css('padding:11px 28px;border-radius:12px;border:1px solid #23d39a;color:#23d39a;font-weight:600;font-size:15px;cursor:pointer')}>Details</div>
           </div>
         </div>
         <div style={css('display:flex;border-top:1px solid rgba(110,200,150,.14)')}>
@@ -79,7 +79,7 @@ export default function Stake({ v }: { v: MoolaVals }) {
           <span style={css('flex:1;text-align:left;font-size:13px;color:#cfe7da;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>moola.app?rid=2103788</span>
           <div onClick={v.copyRef} style={css('padding:8px 18px;border-radius:18px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:700;font-size:13px;cursor:pointer')}>{v.copyLabel}</div>
         </div>
-        <div style={css('font-size:12px;color:#92b8a3;margin-top:11px')}>Commission: <b style={css('color:#23d39a')}>1,843.69</b> $MOOLA</div>
+        <div style={css('font-size:12px;color:#92b8a3;margin-top:11px')}>Commission: <b style={css('color:#23d39a')}>0.000</b> $MOOLA</div>
       </div>
 
       {/* referral breakdown table */}

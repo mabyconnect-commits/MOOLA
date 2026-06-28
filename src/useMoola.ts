@@ -20,6 +20,8 @@ interface MoolaState {
   balance: number
   sol: number
   usdt: number
+  usdc: number
+  payCcy: 'USDT' | 'USDC'
   cd: number
   copyLabel: string
   toast: string
@@ -30,7 +32,7 @@ interface MoolaState {
   claimAddr: string
   faqOpen: number
   deposit: boolean
-  depositAsset: 'SOL' | 'USDT'
+  depositAsset: 'SOL' | 'USDT' | 'USDC'
   depositAmt: string
   depCopied: boolean
   sell: boolean
@@ -39,6 +41,7 @@ interface MoolaState {
   history: boolean
   settings: boolean
   rewards: boolean
+  details: boolean
   notif: boolean
   biometric: boolean
   hideBal: boolean
@@ -57,13 +60,16 @@ const initialState: MoolaState = {
   wallet: false,
   claim: false,
   stakeForm: false,
-  reward: 7.204418,
-  staked: 500,
-  available: 30,
+  // Wallet starts empty — balances stay 0 until the user claims their airdrop.
+  reward: 0,
+  staked: 0,
+  available: 0,
   airdrop: 0,
-  balance: 530,
+  balance: 0,
   sol: 0,
   usdt: 0,
+  usdc: 0,
+  payCcy: 'USDT',
   cd: 12 * 3600 + 24 * 60 + 6,
   copyLabel: 'Copy',
   toast: '',
@@ -83,6 +89,7 @@ const initialState: MoolaState = {
   history: false,
   settings: false,
   rewards: false,
+  details: false,
   notif: true,
   biometric: false,
   hideBal: false,
@@ -170,7 +177,7 @@ export function useMoola() {
   }
 
   const go = (screen: Screen) =>
-    set({ screen, wallet: false, claim: false, stakeForm: false, rewards: false })
+    set({ screen, wallet: false, claim: false, stakeForm: false, rewards: false, details: false })
 
   const cdString = () => {
     const t = Math.max(0, Math.floor(s.cd))
@@ -259,30 +266,32 @@ export function useMoola() {
     set((p) => ({ staked: p.staked + r, balance: p.balance + r, reward: 0, rewards: false }))
     flash('🔁 Compounded ' + fmt(r, 4) + ' $MOOLA into your stake')
   }
-  // Presale is paid in USDT (Solana / SPL). If the user already has enough
-  // USDT deposited, buy immediately; otherwise route them to deposit USDT.
+  // Presale is paid in a Solana (SPL) stablecoin — USDT or USDC. If the user
+  // already holds enough of the chosen coin, buy immediately; otherwise route
+  // them to deposit it.
   const doBuy = () => {
     const amt = parseFloat(stateRef.current.solIn)
     if (!amt || amt <= 0) {
-      flash('Enter a USDT amount')
+      flash('Enter a USDT / USDC amount')
       return
     }
-    if (stateRef.current.usdt >= amt) {
-      const tokens = Math.floor(amt / 0.01) // $0.01 per $MOOLA, USDT ≈ $1
-      set((p) => ({
-        usdt: p.usdt - amt,
-        balance: p.balance + tokens,
-        available: p.available + tokens,
-        solIn: '',
-      }))
-      flash('✅ Bought ' + fmt(tokens, 0) + ' $MOOLA with ' + fmt(amt, 2) + ' USDT')
+    const ccy = stateRef.current.payCcy
+    const bal = ccy === 'USDT' ? stateRef.current.usdt : stateRef.current.usdc
+    if (bal >= amt) {
+      const tokens = Math.floor(amt / 0.01) // $0.01 per $MOOLA, stablecoin ≈ $1
+      set((p) =>
+        ccy === 'USDT'
+          ? { usdt: p.usdt - amt, balance: p.balance + tokens, available: p.available + tokens, solIn: '' }
+          : { usdc: p.usdc - amt, balance: p.balance + tokens, available: p.available + tokens, solIn: '' },
+      )
+      flash('✅ Bought ' + fmt(tokens, 0) + ' $MOOLA with ' + fmt(amt, 2) + ' ' + ccy)
     } else {
-      const needed = amt - stateRef.current.usdt
-      set({ deposit: true, depositAsset: 'USDT', depositAmt: needed.toFixed(2) })
-      flash('Deposit USDT on Solana to continue')
+      const needed = amt - bal
+      set({ deposit: true, depositAsset: ccy, depositAmt: needed.toFixed(2) })
+      flash('Deposit ' + ccy + ' on Solana to continue')
     }
   }
-  const openDeposit = (asset: 'SOL' | 'USDT') =>
+  const openDeposit = (asset: 'SOL' | 'USDT' | 'USDC') =>
     set({ deposit: true, depositAsset: asset, depositAmt: '', wallet: false })
   const confirmDeposit = () => {
     const amt = parseFloat(stateRef.current.depositAmt) || 0
@@ -294,7 +303,9 @@ export function useMoola() {
     set((p) =>
       asset === 'SOL'
         ? { sol: p.sol + amt, deposit: false, depositAmt: '' }
-        : { usdt: p.usdt + amt, deposit: false, depositAmt: '' },
+        : asset === 'USDT'
+          ? { usdt: p.usdt + amt, deposit: false, depositAmt: '' }
+          : { usdc: p.usdc + amt, deposit: false, depositAmt: '' },
     )
     flash('✅ ' + fmt(amt, asset === 'SOL' ? 4 : 2) + ' ' + asset + ' credited to your wallet')
   }
@@ -346,6 +357,7 @@ export function useMoola() {
   const dim = '#5e7d6a'
   const solNum = parseFloat(s.solIn) || 0
   const stakeNum = parseFloat(s.stakeAmt) || 0
+  const payBal = s.payCcy === 'USDT' ? s.usdt : s.usdc
 
   const faqs = faqData.map((f, i) => ({
     q: f.q,
@@ -417,6 +429,7 @@ export function useMoola() {
     usdtStr: fmt(s.balance * 0.01, 2),
     solStr: fmt(s.sol, 4),
     usdtBalStr: fmt(s.usdt, 2),
+    usdcBalStr: fmt(s.usdc, 2),
     rewardStr: fmt(s.reward, 6),
     cdStr: cdString(),
     dailyRewardsStr: fmt(s.staked * 0.0205, 3),
@@ -431,10 +444,13 @@ export function useMoola() {
     solIn: s.solIn,
     stakeAmt: s.stakeAmt,
     buyTokens: solNum > 0 ? fmt(Math.floor(solNum / 0.01), 0) : '0',
-    // presale pays in USDT: if the user already holds enough USDT they can buy
-    // straight away, otherwise the CTA sends them to deposit USDT first.
-    buyNeedsDeposit: solNum > 0 && s.usdt < solNum,
-    buyCtaLabel: solNum > 0 && s.usdt < solNum ? 'Deposit USDT to continue' : 'Buy $MOOLA',
+    // presale pays in USDT or USDC: if the user already holds enough of the
+    // chosen coin they can buy now, otherwise the CTA routes them to deposit.
+    payCcy: s.payCcy,
+    payBalStr: fmt(payBal, 2),
+    setPayCcy: (c: 'USDT' | 'USDC') => set({ payCcy: c }),
+    buyNeedsDeposit: solNum > 0 && payBal < solNum,
+    buyCtaLabel: solNum > 0 && payBal < solNum ? `Deposit ${s.payCcy} to continue` : 'Buy $MOOLA',
     stakeEstTotal: stakeNum > 0 ? fmt(stakeNum * 0.0205 * 20, 3) : '0.000',
     stakeEstDaily: stakeNum > 0 ? fmt(stakeNum * 0.0205, 3) : '0.000',
     claimAddr: s.claimAddr,
@@ -460,6 +476,11 @@ export function useMoola() {
     closeRewards: () => set({ rewards: false }),
     claimRewards,
     compoundRewards,
+    // Staking Details sheet
+    details: s.details,
+    stakedUsdStr: fmt(s.staked * 0.01, 2),
+    openDetails: () => set({ details: true }),
+    closeDetails: () => set({ details: false }),
     onSol: onInput('solIn'),
     onStakeAmt: onInput('stakeAmt'),
     setMaxStake: () => set({ stakeAmt: String(stateRef.current.available) }),
@@ -472,7 +493,7 @@ export function useMoola() {
     depositAmt: s.depositAmt,
     depAddr: 'So1aMooLaPreSa1e9xKqTbD7vRt4Z8aE2nWyMoo9aE2',
     depTokensStr:
-      s.depositAsset === 'USDT' && parseFloat(s.depositAmt) > 0
+      s.depositAsset !== 'SOL' && parseFloat(s.depositAmt) > 0
         ? fmt(Math.floor(parseFloat(s.depositAmt) / 0.01), 0)
         : '',
     depCopyLabel: s.depCopied ? 'Copied!' : 'Copy',

@@ -38,6 +38,11 @@ export default function Overlays({ v }: { v: MoolaVals }) {
                 <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>{v.usdtBalStr} USDT</div><div style={css('font-size:11.5px;color:#92b8a3')}>Solana (SPL) · buy presale</div></div>
                 <div onClick={() => v.openDeposit('USDT')} style={css('padding:7px 16px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Deposit</div>
               </div>
+              <div style={css('display:flex;align-items:center;gap:11px;padding:12px 13px;border-radius:13px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.16)')}>
+                <div style={css('width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#2775ca,#3b9bff);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff')}>$</div>
+                <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>{v.usdcBalStr} USDC</div><div style={css('font-size:11.5px;color:#92b8a3')}>Solana (SPL) · buy presale</div></div>
+                <div onClick={() => v.openDeposit('USDC')} style={css('padding:7px 16px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Deposit</div>
+              </div>
             </div>
             <div style={css('display:flex;gap:11px;margin-bottom:18px')}>
               <div onClick={v.goPresale} style={css('flex:1;text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;cursor:pointer')}>↓ Buy</div>
@@ -51,12 +56,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               <div onClick={v.copyRef} style={css('padding:7px 14px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Copy</div>
             </div>
             <div style={css('font-size:13px;color:#92b8a3;margin:18px 0 9px')}>Recent activity</div>
-            <div style={css('display:flex;align-items:center;gap:11px;padding:11px 0;border-top:1px solid rgba(110,200,150,.1)')}>
-              <span style={css('font-size:17px')}>↓</span><div style={css('flex:1')}><div style={css('font-size:13.5px;font-weight:600')}>Presale buy</div><div style={css('font-size:11.5px;color:#92b8a3')}>2 hrs ago</div></div><span style={css('color:#23d39a;font-weight:700;font-size:14px')}>+30,000</span>
-            </div>
-            <div style={css('display:flex;align-items:center;gap:11px;padding:11px 0;border-top:1px solid rgba(110,200,150,.1)')}>
-              <span style={css('font-size:17px')}>🎁</span><div style={css('flex:1')}><div style={css('font-size:13.5px;font-weight:600')}>Airdrop claimed</div><div style={css('font-size:11.5px;color:#92b8a3')}>Yesterday</div></div><span style={css('color:#23d39a;font-weight:700;font-size:14px')}>+200</span>
-            </div>
+            <div style={css('text-align:center;padding:18px 0;border-top:1px solid rgba(110,200,150,.1);font-size:13px;color:#7ea98f')}>No activity yet — claim your airdrop to get started.</div>
           </div>
         </div>
       )}
@@ -163,6 +163,46 @@ export default function Overlays({ v }: { v: MoolaVals }) {
         </div>
       )}
 
+      {/* ===== STAKING DETAILS ===== */}
+      {v.details && (
+        <div onClick={v.closeDetails} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.7);display:flex;justify-content:center;align-items:flex-end')}>
+          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;animation:riseIn .3s ease')}>
+            <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
+            <div style={css('display:flex;justify-content:space-between;align-items:center;margin-bottom:16px')}>
+              <span style={css('font-size:19px;font-weight:800')}>Staking Details</span>
+              <div onClick={v.closeDetails} style={css('width:32px;height:32px;border-radius:50%;background:rgba(6,22,14,.6);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer')}>✕</div>
+            </div>
+
+            {/* total staked summary */}
+            <div style={css('border-radius:18px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.16);padding:18px 16px;text-align:center;margin-bottom:14px')}>
+              <div style={css('font-size:12.5px;color:#92b8a3')}>Total Staked</div>
+              <div style={css('font-size:30px;font-weight:800;margin:3px 0;font-variant-numeric:tabular-nums')}>{v.stakedStr} <span style={css('font-size:15px;color:#92b8a3')}>$MOOLA</span></div>
+              <div style={css('font-size:13px;color:#23d39a')}>≈ ${v.stakedUsdStr}</div>
+            </div>
+
+            {/* position breakdown */}
+            <div style={css('border-radius:14px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.14);padding:6px 16px;margin-bottom:14px')}>
+              <div style={css('display:flex;justify-content:space-between;align-items:center;padding:11px 0;font-size:13.5px;border-bottom:1px solid rgba(110,200,150,.1)')}><span style={css('color:#92b8a3')}>Status</span><span style={css('font-weight:700;color:#23d39a')}>● Active</span></div>
+              <div style={css('display:flex;justify-content:space-between;align-items:center;padding:11px 0;font-size:13.5px;border-bottom:1px solid rgba(110,200,150,.1)')}><span style={css('color:#92b8a3')}>APR</span><span style={css('font-weight:700')}>2.05% / day · 41% / 20d</span></div>
+              <div style={css('display:flex;justify-content:space-between;align-items:center;padding:11px 0;font-size:13.5px;border-bottom:1px solid rgba(110,200,150,.1)')}><span style={css('color:#92b8a3')}>Lock period</span><span style={css('font-weight:700')}>20 days</span></div>
+              <div style={css('display:flex;justify-content:space-between;align-items:center;padding:11px 0;font-size:13.5px;border-bottom:1px solid rgba(110,200,150,.1)')}><span style={css('color:#92b8a3')}>Daily rewards</span><span style={css('font-weight:700;color:#23d39a')}>{v.dailyRewardsStr} $MOOLA</span></div>
+              <div style={css('display:flex;justify-content:space-between;align-items:center;padding:11px 0;font-size:13.5px;border-bottom:1px solid rgba(110,200,150,.1)')}><span style={css('color:#92b8a3')}>Total rewards (20d)</span><span style={css('font-weight:700;color:#f2b34e')}>{v.totalRewardsStr} $MOOLA</span></div>
+              <div style={css('display:flex;justify-content:space-between;align-items:center;padding:11px 0;font-size:13.5px')}><span style={css('color:#92b8a3')}>Stake cap</span><span style={css('font-weight:700')}>1,000,000 $MOOLA</span></div>
+            </div>
+
+            {/* lock progress */}
+            <div style={css('border-radius:14px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.14);padding:14px 16px;margin-bottom:16px')}>
+              <div style={css('display:flex;justify-content:space-between;font-size:12.5px;color:#92b8a3;margin-bottom:9px')}><span>Lock progress · Day 4 of 20</span><span style={css('color:#cfe7da;font-weight:700')}>~16 days left</span></div>
+              <div style={css('height:10px;border-radius:6px;background:rgba(6,22,14,.7);overflow:hidden')}>
+                <div style={css('width:20%;height:100%;border-radius:6px;background:linear-gradient(90deg,#23d39a,#f2b34e);box-shadow:0 0 12px rgba(35,211,154,.5)')}></div>
+              </div>
+            </div>
+
+            <div onClick={v.openStakeForm} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:16px;cursor:pointer')}>⊕ Stake more</div>
+          </div>
+        </div>
+      )}
+
       {/* ===== DEPOSIT (SOL or USDT on Solana / SPL) ===== */}
       {v.deposit && (
         <div style={css('position:fixed;inset:0;z-index:58;background:#06110b;display:flex;justify-content:center;overflow-y:auto')}>
@@ -257,16 +297,26 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               <div onClick={v.closeHistory} style={css('width:36px;height:36px;border-radius:50%;background:rgba(15,40,28,.7);border:1px solid rgba(110,200,150,.2);display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer')}>‹</div>
               <span style={css('font-size:19px;font-weight:800')}>Transaction History</span>
             </div>
-            <div style={css('border-radius:18px;background:rgba(15,40,28,.5);border:1px solid rgba(110,200,150,.14);overflow:hidden')}>
-              {v.txns.map((t, i) => (
-                <div key={i} style={css('display:flex;align-items:center;gap:13px;padding:15px 16px;border-bottom:1px solid rgba(110,200,150,.1)')}>
-                  <div style={css('width:40px;height:40px;border-radius:12px;background:rgba(6,22,14,.6);display:flex;align-items:center;justify-content:center;font-size:18px')}>{t.icon}</div>
-                  <div style={css('flex:1')}><div style={css('font-size:14.5px;font-weight:600')}>{t.title}</div><div style={css('font-size:11.5px;color:#92b8a3;margin-top:2px')}>{t.sub}</div></div>
-                  <div style={css(`font-size:14.5px;font-weight:700;color:${t.amtColor}`)}>{t.amt}</div>
+            {v.txns.length > 0 ? (
+              <>
+                <div style={css('border-radius:18px;background:rgba(15,40,28,.5);border:1px solid rgba(110,200,150,.14);overflow:hidden')}>
+                  {v.txns.map((t, i) => (
+                    <div key={i} style={css('display:flex;align-items:center;gap:13px;padding:15px 16px;border-bottom:1px solid rgba(110,200,150,.1)')}>
+                      <div style={css('width:40px;height:40px;border-radius:12px;background:rgba(6,22,14,.6);display:flex;align-items:center;justify-content:center;font-size:18px')}>{t.icon}</div>
+                      <div style={css('flex:1')}><div style={css('font-size:14.5px;font-weight:600')}>{t.title}</div><div style={css('font-size:11.5px;color:#92b8a3;margin-top:2px')}>{t.sub}</div></div>
+                      <div style={css(`font-size:14.5px;font-weight:700;color:${t.amtColor}`)}>{t.amt}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div style={css('text-align:center;font-size:12px;color:#5e7d6a;margin-top:18px')}>Showing your last 7 transactions</div>
+                <div style={css('text-align:center;font-size:12px;color:#5e7d6a;margin-top:18px')}>Showing your recent transactions</div>
+              </>
+            ) : (
+              <div style={css('text-align:center;padding:50px 20px;color:#7ea98f')}>
+                <div style={css('font-size:40px;margin-bottom:10px')}>🧾</div>
+                <div style={css('font-size:14.5px;font-weight:600;color:#cfe7da')}>No transactions yet</div>
+                <div style={css('font-size:12.5px;margin-top:5px')}>Claim your airdrop or buy in the presale to get started.</div>
+              </div>
+            )}
           </div>
         </div>
       )}
