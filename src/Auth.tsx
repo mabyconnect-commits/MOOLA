@@ -59,10 +59,16 @@ export default function Auth({ v }: { v: MoolaVals }) {
               <input value={v.email} onChange={v.onEmail} type="email" placeholder="you@email.com" style={css('width:100%;margin:7px 0 16px;padding:14px 15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:15px;font-family:Sora,sans-serif;outline:none')} />
 
               <label style={css('font-size:12px;color:#92b8a3;font-weight:600;letter-spacing:.3px')}>PASSWORD</label>
-              <input value={v.password} onChange={v.onPassword} type="password" placeholder="At least 8 characters" style={css('width:100%;margin:7px 0 16px;padding:14px 15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:15px;font-family:Sora,sans-serif;outline:none')} />
+              <div style={css('position:relative;margin:7px 0 16px')}>
+                <input value={v.password} onChange={v.onPassword} type={v.pwType} placeholder="At least 8 characters" style={css('width:100%;padding:14px 46px 14px 15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:15px;font-family:Sora,sans-serif;outline:none')} />
+                <span onClick={v.toggleShowPw} style={css('position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:6px 9px;font-size:17px;cursor:pointer;user-select:none')}>{v.pwEye}</span>
+              </div>
 
               <label style={css('font-size:12px;color:#92b8a3;font-weight:600;letter-spacing:.3px')}>CONFIRM PASSWORD</label>
-              <input value={v.confirm} onChange={v.onConfirm} type="password" placeholder="Re-enter password" style={css('width:100%;margin:7px 0 22px;padding:14px 15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:15px;font-family:Sora,sans-serif;outline:none')} />
+              <div style={css('position:relative;margin:7px 0 22px')}>
+                <input value={v.confirm} onChange={v.onConfirm} type={v.pwType} placeholder="Re-enter password" style={css('width:100%;padding:14px 46px 14px 15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:15px;font-family:Sora,sans-serif;outline:none')} />
+                <span onClick={v.toggleShowPw} style={css('position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:6px 9px;font-size:17px;cursor:pointer;user-select:none')}>{v.pwEye}</span>
+              </div>
 
               <div onClick={v.doSignup} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:700;font-size:15.5px;cursor:pointer;box-shadow:0 8px 24px rgba(35,211,154,.3)')}>Create account</div>
 
@@ -97,7 +103,10 @@ export default function Auth({ v }: { v: MoolaVals }) {
               <input value={v.email} onChange={v.onEmail} type="email" placeholder="you@email.com" style={css('width:100%;margin:7px 0 16px;padding:14px 15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:15px;font-family:Sora,sans-serif;outline:none')} />
 
               <label style={css('font-size:12px;color:#92b8a3;font-weight:600;letter-spacing:.3px')}>PASSWORD</label>
-              <input value={v.password} onChange={v.onPassword} type="password" placeholder="Your password" style={css('width:100%;margin:7px 0 8px;padding:14px 15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:15px;font-family:Sora,sans-serif;outline:none')} />
+              <div style={css('position:relative;margin:7px 0 8px')}>
+                <input value={v.password} onChange={v.onPassword} type={v.pwType} placeholder="Your password" style={css('width:100%;padding:14px 46px 14px 15px;border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:15px;font-family:Sora,sans-serif;outline:none')} />
+                <span onClick={v.toggleShowPw} style={css('position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:6px 9px;font-size:17px;cursor:pointer;user-select:none')}>{v.pwEye}</span>
+              </div>
               <div style={css('text-align:right;font-size:12.5px;color:#23d39a;font-weight:600;margin-bottom:22px;cursor:pointer')} onClick={v.toastSoon}>Forgot password?</div>
 
               <div onClick={v.doLogin} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:700;font-size:15.5px;cursor:pointer;box-shadow:0 8px 24px rgba(35,211,154,.3)')}>Log in</div>
