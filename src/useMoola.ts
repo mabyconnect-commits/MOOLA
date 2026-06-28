@@ -514,7 +514,15 @@ export function useMoola() {
     try {
       const r = await api.action('deposit-check', {})
       if (r.account) applyAccount(r.account, r.txns)
-      if (r.found) {
+      // Surface why a sweep to treasury didn't complete (diagnostic).
+      const note = r.sweepNote
+      if (note === 'not-configured') {
+        flash('Credited. Auto-sweep off (TREASURY_SECRET not set).')
+      } else if (note === 'incomplete') {
+        flash('Credited, but sweep stalled — treasury likely needs SOL for gas.')
+      } else if (note && note.startsWith('error:')) {
+        flash('Sweep error: ' + note.slice(6).trim())
+      } else if (r.found) {
         set({ deposit: false, depositAmt: '' })
         flash('✅ Deposit detected and credited!')
       } else {
