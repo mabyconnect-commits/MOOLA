@@ -191,22 +191,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let depUsdt = onchain.usdt
         let depUsdc = onchain.usdc
         const hasFunds = onchain.sol > 0.0001 || onchain.usdt > 0 || onchain.usdc > 0
-        if (payoutConfigured() && hasFunds) {
-          try {
-            await sweepToTreasury(index)
+        // sweepNote tells the client *why* a sweep didn't complete, so the
+        // failure isn't silently swallowed (config gap vs gas vs cluster issue).
+        let sweepNote: string | null = null
+        if (hasFunds) {
+          if (!payoutConfigured()) {
+            sweepNote = 'not-configured'
+          } else {
+            try {
+              await sweepToTreasury(index)
+            } catch (e) {
+              sweepNote = 'error: ' + (e instanceof Error ? e.message : String(e))
+              console.error('[moola] treasury sweep failed:', e)
+            }
+            // Re-read; if funds still sit here the sweep didn't actually move
+            // them (usually the treasury has no SOL for gas, or a cluster/mint
+            // mismatch between the RPC and where the funds live).
             const after = await readBalances(index)
             depSol = after.sol
             depUsdt = after.usdt
             depUsdc = after.usdc
-          } catch (e) {
-            console.error('[moola] treasury sweep failed:', e)
+            if (!sweepNote && (after.sol > 0.0001 || after.usdt > 0 || after.usdc > 0)) {
+              sweepNote = 'incomplete'
+            }
           }
         }
         await sql`UPDATE accounts SET dep_sol = ${depSol}, dep_usdt = ${depUsdt}, dep_usdc = ${depUsdc} WHERE user_id = ${userId}`
 
         const account = await loadAccount(userId)
         const txns = await loadTxns(userId)
-        return res.status(200).json({ account, txns, found })
+        return res.status(200).json({ account, txns, found, sweepNote })
       }
 
       // ---- SELL -----------------------------------------------------------

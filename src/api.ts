@@ -79,6 +79,7 @@ export interface AccountResponse {
   depositAmt?: string
   address?: string
   found?: boolean
+  sweepNote?: string | null
   stats?: Stats
 }
 
