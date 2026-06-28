@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { ensureSchema } from '../_lib/db'
-import { SOLANA_ADDR_RE, userIdFromReq } from '../_lib/auth'
+import { ensureSchema } from '../_lib/db.js'
+import { SOLANA_ADDR_RE, userIdFromReq } from '../_lib/auth.js'
 import {
   AIRDROP_AMOUNT,
   PRESALE_PRICE,
@@ -12,7 +12,7 @@ import {
   loadAccount,
   loadTxns,
   saveAccount,
-} from '../_lib/economics'
+} from '../_lib/economics.js'
 
 type Ccy = 'USDT' | 'USDC'
 type Asset = 'SOL' | 'USDT' | 'USDC'

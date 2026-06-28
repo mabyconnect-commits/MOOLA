@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { ensureSchema } from './_lib/db'
-import { userIdFromReq } from './_lib/auth'
-import { loadAccount, loadTxns } from './_lib/economics'
+import { ensureSchema } from './_lib/db.js'
+import { userIdFromReq } from './_lib/auth.js'
+import { loadAccount, loadTxns } from './_lib/economics.js'
 
 // GET /api/account — returns the signed-in user's current balances + history.
 // This is what hydrates the app on load so state survives reloads and devices.

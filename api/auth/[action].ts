@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { ensureSchema, sql } from '../_lib/db'
-import { EMAIL_RE, hashPassword, signToken, verifyPassword } from '../_lib/auth'
-import { sendVerificationEmail } from '../_lib/email'
-import { ensureAccount, loadAccount, loadTxns } from '../_lib/economics'
+import { ensureSchema, sql } from '../_lib/db.js'
+import { EMAIL_RE, hashPassword, signToken, verifyPassword } from '../_lib/auth.js'
+import { sendVerificationEmail } from '../_lib/email.js'
+import { ensureAccount, loadAccount, loadTxns } from '../_lib/economics.js'
 
 interface UserRow {
   id: number
