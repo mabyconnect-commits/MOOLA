@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.0" baseProfile="tiny-ps" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" width="480" height="480">
+  <title>Moola</title>
+  <defs>
+    <linearGradient id="hex" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2fe3c2"/>
+      <stop offset="1" stop-color="#1bbd84"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="480" height="480" fill="#06140d"/>
+
+  <!-- hexagon badge -->
+  <path d="M240 52 L398 145 L398 335 L240 428 L82 335 L82 145 Z" fill="url(#hex)"/>
+
+  <!-- horns -->
+  <path d="M150 168 q-26 -34 -8 -64 q24 18 30 56 z" fill="#eafff4"/>
+  <path d="M330 168 q26 -34 8 -64 q-24 18 -30 56 z" fill="#eafff4"/>
+
+  <!-- ears -->
+  <ellipse cx="138" cy="214" rx="40" ry="28" fill="#eafff4"/>
+  <ellipse cx="342" cy="214" rx="40" ry="28" fill="#eafff4"/>
+  <ellipse cx="138" cy="214" rx="20" ry="13" fill="#9fe6c6"/>
+  <ellipse cx="342" cy="214" rx="20" ry="13" fill="#9fe6c6"/>
+
+  <!-- head -->
+  <rect x="150" y="172" width="180" height="172" rx="74" fill="#eafff4"/>
+
+  <!-- eyes -->
+  <circle cx="203" cy="248" r="19" fill="#06140d"/>
+  <circle cx="277" cy="248" r="19" fill="#06140d"/>
+  <circle cx="210" cy="241" r="6" fill="#ffffff"/>
+  <circle cx="284" cy="241" r="6" fill="#ffffff"/>
+
+  <!-- muzzle -->
+  <rect x="183" y="286" width="114" height="58" rx="29" fill="#cdeede"/>
+  <circle cx="216" cy="314" r="9" fill="#06140d"/>
+  <circle cx="264" cy="314" r="9" fill="#06140d"/>
+</svg>
