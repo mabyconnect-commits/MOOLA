@@ -222,6 +222,11 @@ export function useMoola() {
   stateRef.current = s
   const toastTimer = useRef<ReturnType<typeof setTimeout>>()
   const orbs = useMemo(buildOrbs, [])
+  // Wall-clock anchor for the reward display: the server's reward value at the
+  // last sync, and when that sync happened. The ticker computes the live reward
+  // from these so it stays accurate even after the tab was backgrounded.
+  const rewardBaseRef = useRef(0)
+  const rewardSyncRef = useRef(Date.now())
 
   // Functional/partial setState helper that mirrors React class setState.
   const set = (patch: Partial<MoolaState> | ((prev: MoolaState) => Partial<MoolaState>)) => {
@@ -231,6 +236,9 @@ export function useMoola() {
   // Merge a server account snapshot (and optionally history) into local state.
   // The server is authoritative for every economic number.
   const applyAccount = (acc: Account, txns?: ApiTxn[]) => {
+    // Anchor the live reward ticker to this fresh server value.
+    rewardBaseRef.current = acc.reward
+    rewardSyncRef.current = Date.now()
     set({
       balance: acc.balance,
       staked: acc.staked,
@@ -312,16 +320,49 @@ export function useMoola() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // live rewards ticker (cosmetic — reconciled with the server on every sync)
+  // Live rewards ticker. Computes the reward from the wall clock since the last
+  // server sync (not by accumulating), so it stays correct even after the tab
+  // was backgrounded (where timers are throttled/paused).
   useEffect(() => {
     const t = setInterval(() => {
-      setFull((prev) => ({
-        ...prev,
-        reward: prev.reward + (prev.staked * 0.0205) / 86400 * 0.2,
-        cd: prev.cd > 0 ? prev.cd - 0.2 : 12 * 3600,
-      }))
+      setFull((prev) => {
+        const elapsedSec = (Date.now() - rewardSyncRef.current) / 1000
+        const accrued = (prev.staked * 0.0205 * elapsedSec) / 86400
+        return {
+          ...prev,
+          reward: rewardBaseRef.current + accrued,
+          cd: prev.cd > 0 ? prev.cd - 0.2 : 12 * 3600,
+        }
+      })
     }, 200)
     return () => clearInterval(t)
+  }, [])
+
+  // When the user returns to the tab (or refocuses the window), re-sync from the
+  // server so balances + the reward base reflect everything that accrued while
+  // away. The server is authoritative; nothing is ever lost by leaving.
+  useEffect(() => {
+    const resync = () => {
+      if (document.visibilityState !== 'visible') return
+      if (!getToken() || !stateRef.current.authed) return
+      api
+        .account()
+        .then((r) => {
+          applyAccount(r.account, r.txns)
+          applyReferral(r.referral)
+          applyStats(r.stats)
+        })
+        .catch(() => {
+          /* offline / transient — the wall-clock ticker keeps the display live */
+        })
+    }
+    document.addEventListener('visibilitychange', resync)
+    window.addEventListener('focus', resync)
+    return () => {
+      document.removeEventListener('visibilitychange', resync)
+      window.removeEventListener('focus', resync)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const flash = (msg: string) => {
