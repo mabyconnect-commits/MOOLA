@@ -966,11 +966,12 @@ export function useMoola() {
     sell: s.sell,
     sellAmt: s.sellAmt,
     sellAsset: s.sellAsset,
-    sellSolStr: (((parseFloat(s.sellAmt) || 0) * 0.01) / 152).toFixed(4),
+    // Sell quote uses the $0.0095 sell rate (5% below the $0.01 buy rate).
+    sellSolStr: (((parseFloat(s.sellAmt) || 0) * 0.0095) / 152).toFixed(4),
     sellRecvStr:
       s.sellAsset === 'SOL'
-        ? (((parseFloat(s.sellAmt) || 0) * 0.01) / 152).toFixed(4) + ' SOL'
-        : fmt((parseFloat(s.sellAmt) || 0) * 0.01, 2) + ' ' + s.sellAsset,
+        ? (((parseFloat(s.sellAmt) || 0) * 0.0095) / 152).toFixed(4) + ' SOL'
+        : fmt((parseFloat(s.sellAmt) || 0) * 0.0095, 2) + ' ' + s.sellAsset,
     setSellAsset: (a: 'SOL' | 'USDT' | 'USDC') => set({ sellAsset: a }),
     openSell: () => set({ sell: true, wallet: false }),
     closeSell: () => set({ sell: false }),

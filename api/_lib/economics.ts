@@ -6,7 +6,11 @@ import { sql } from './db.js'
 // ---------------------------------------------------------------------------
 export const DAILY_RATE = 0.0205 // 2.05% per day
 export const STAKE_DAYS = 20
-export const PRESALE_PRICE = 0.01 // $0.01 per $MOOLA
+export const PRESALE_PRICE = 0.01 // $0.01 per $MOOLA — the buy rate
+// Sell rate is $0.0095 per $MOOLA: a 5% platform spread below the buy rate.
+// (0.0095 / 0.01 = 0.95, so the platform keeps 5% on every sell.)
+export const SELL_PRICE = 0.0095
+export const SELL_FEE_PCT = 5 // platform take on each sell (the buy↔sell spread)
 export const SOL_PRICE = 152 // illustrative SOL price used for sell quotes
 export const AIRDROP_AMOUNT = 200 // $MOOLA granted on airdrop claim
 

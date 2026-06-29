@@ -9,6 +9,7 @@ import { rateLimit } from '../_lib/ratelimit.js'
 import {
   AIRDROP_AMOUNT,
   PRESALE_PRICE,
+  SELL_PRICE,
   SOL_PRICE,
   STAKE_DAYS,
   DAILY_RATE,
@@ -275,7 +276,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!amt || amt <= 0) return res.status(400).json({ error: 'Enter an amount to sell' })
         if (amt < 50) return res.status(400).json({ error: 'Minimum sell is 50 $MOOLA' })
         if (amt > a.available) return res.status(400).json({ error: 'Insufficient available balance' })
-        const usd = amt * PRESALE_PRICE // $0.01 per $MOOLA
+        // Sell at $0.0095 (5% below the $0.01 buy rate) — the platform's spread.
+        const usd = amt * SELL_PRICE
         a.available -= amt
         a.balance -= amt
         let recvStr: string

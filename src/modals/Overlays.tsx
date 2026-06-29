@@ -297,7 +297,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               <span style={css('font-size:18px;font-weight:800;color:#f2b34e')}>{v.sellRecvStr}</span>
             </div>
             <div onClick={v.doSell} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#f2b34e,#ff9d3c);color:#2a1a06;font-weight:800;font-size:16px;cursor:pointer')}>Sell to {v.sellAsset}</div>
-            <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Only unstaked $MOOLA can be sold · Min 50 $MOOLA · Sell fee 7%</div>
+            <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Only unstaked $MOOLA can be sold · Min 50 $MOOLA · Buy $0.01 / Sell $0.0095 (5% fee)</div>
           </div>
         </div>
       )}
