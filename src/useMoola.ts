@@ -1,8 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { faqData, nfts as nftBase, refLevels, refRows, roadmap, type Nft } from './data'
-import { api, clearToken, getToken, setToken, type Account, type ApiTxn, type RefRow, type ReferralData, type Stats } from './api'
+import {
+  api,
+  clearToken,
+  getToken,
+  setToken,
+  type Account,
+  type ApiTxn,
+  type RefRow,
+  type ReferralData,
+  type Stats,
+  type AdminOverview,
+  type AdminWithdrawal,
+  type AdminUser,
+} from './api'
 
-export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me'
+export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me' | 'admin'
 export type AuthView = 'welcome' | 'signup' | 'verify' | 'login'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -77,6 +90,11 @@ interface MoolaState {
   refRowsData: RefRow[]
   stats: Stats
   stakedAt: number | null
+  isAdmin: boolean
+  adminOverview: AdminOverview | null
+  adminWithdrawals: AdminWithdrawal[]
+  adminUsers: AdminUser[]
+  adminBusy: boolean
 }
 
 // Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
@@ -151,6 +169,11 @@ const initialState: MoolaState = {
   refRowsData: refRows,
   stats: BASE_STATS,
   stakedAt: null,
+  isAdmin: false,
+  adminOverview: null,
+  adminWithdrawals: [],
+  adminUsers: [],
+  adminBusy: false,
 }
 
 function fmt(n: number, d: number): string {
@@ -301,7 +324,7 @@ export function useMoola() {
         } catch {
           /* ignore */
         }
-        set({ authed: true, screen: restored, booting: false })
+        set({ authed: true, screen: restored, booting: false, isAdmin: !!r.isAdmin })
         // Warm the deterministic deposit address in the background so the
         // deposit sheet opens instantly (and never re-generates it).
         api
@@ -438,7 +461,7 @@ export function useMoola() {
       applyReferral(r.referral)
       applyStats(r.stats)
       persistScreen('home')
-      set({ authed: true, password: '', confirm: '', code: '', screen: 'home', claim: false, claimStep: 1, booting: false })
+      set({ authed: true, password: '', confirm: '', code: '', screen: 'home', claim: false, claimStep: 1, booting: false, isAdmin: !!r.isAdmin })
     } catch (e) {
       flash(errMsg(e))
     } finally {
@@ -469,7 +492,7 @@ export function useMoola() {
       applyReferral(r.referral)
       applyStats(r.stats)
       persistScreen('home')
-      set({ authed: true, password: '', screen: 'home', claim: false, booting: false })
+      set({ authed: true, password: '', screen: 'home', claim: false, booting: false, isAdmin: !!r.isAdmin })
     } catch (e) {
       const data = (e as { data?: { needsVerify?: boolean; devCode?: string | null } }).data
       if (data?.needsVerify) {
@@ -712,6 +735,54 @@ export function useMoola() {
     flash('Signed out')
   }
 
+  // ---- admin dashboard ----
+  const adminLoad = async () => {
+    set({ adminBusy: true })
+    try {
+      const [ov, wd] = await Promise.all([api.admin.overview(), api.admin.withdrawals()])
+      set({ adminOverview: ov, adminWithdrawals: wd.withdrawals })
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ adminBusy: false })
+    }
+  }
+  const openAdmin = () => {
+    persistScreen('admin')
+    set({ screen: 'admin', wallet: false })
+    adminLoad()
+  }
+  const adminResolve = async (id: number) => {
+    try {
+      const r = await api.admin.resolve(id)
+      flash('Withdrawal #' + id + ': ' + r.resolved)
+      await adminLoad()
+    } catch (e) {
+      flash(errMsg(e))
+    }
+  }
+  const adminSweepAll = async () => {
+    if (stateRef.current.adminBusy) return
+    set({ adminBusy: true })
+    try {
+      const r = await api.admin.sweepAll()
+      flash(`Swept ${r.swept} of ${r.checked} checked`)
+      await adminLoad()
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ adminBusy: false })
+    }
+  }
+  const adminLoadUsers = async (q?: string) => {
+    try {
+      const r = await api.admin.users(q)
+      set({ adminUsers: r.users })
+    } catch (e) {
+      flash(errMsg(e))
+    }
+  }
+
   const v = {
     // screen flags
     isHome: s.screen === 'home',
@@ -719,6 +790,18 @@ export function useMoola() {
     isPresale: s.screen === 'presale',
     isMe: s.screen === 'me',
     isNft: s.screen === 'nft',
+    isAdminScreen: s.screen === 'admin',
+    // admin
+    isAdmin: s.isAdmin,
+    adminOverview: s.adminOverview,
+    adminWithdrawals: s.adminWithdrawals,
+    adminUsers: s.adminUsers,
+    adminBusy: s.adminBusy,
+    openAdmin,
+    adminRefresh: adminLoad,
+    adminResolve,
+    adminSweepAll,
+    adminLoadUsers,
     // auth gate — stay hidden while we boot/hydrate an existing session
     showAuth: !s.authed && !s.booting,
     booting: s.booting,

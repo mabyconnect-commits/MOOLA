@@ -55,9 +55,14 @@ export default function Me({ v }: { v: MoolaVals }) {
         <div onClick={v.openHistory} style={css('display:flex;align-items:center;gap:13px;padding:15px 16px;border-bottom:1px solid rgba(110,200,150,.1);cursor:pointer')}>
           <span style={css('font-size:19px')}>🧾</span><span style={css('flex:1;font-size:15px;font-weight:600')}>Transaction History</span><span style={css('color:#7ea98f')}>›</span>
         </div>
-        <div onClick={v.openSettings} style={css('display:flex;align-items:center;gap:13px;padding:15px 16px;cursor:pointer')}>
+        <div onClick={v.openSettings} style={css('display:flex;align-items:center;gap:13px;padding:15px 16px;cursor:pointer' + (v.isAdmin ? ';border-bottom:1px solid rgba(110,200,150,.1)' : ''))}>
           <span style={css('font-size:19px')}>⚙️</span><span style={css('flex:1;font-size:15px;font-weight:600')}>Settings</span><span style={css('color:#7ea98f')}>›</span>
         </div>
+        {v.isAdmin && (
+          <div onClick={v.openAdmin} style={css('display:flex;align-items:center;gap:13px;padding:15px 16px;cursor:pointer')}>
+            <span style={css('font-size:19px')}>🛠</span><span style={css('flex:1;font-size:15px;font-weight:600')}>Admin Dashboard</span><span style={css('color:#7ea98f')}>›</span>
+          </div>
+        )}
       </div>
     </div>
   )

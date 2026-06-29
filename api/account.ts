@@ -3,6 +3,7 @@ import { ensureSchema } from './_lib/db.js'
 import { userIdFromReq } from './_lib/auth.js'
 import { loadAccount, loadTxns, loadStats } from './_lib/economics.js'
 import { loadReferral } from './_lib/referral.js'
+import { isAdminUser } from './_lib/admin.js'
 
 // GET /api/account — returns the signed-in user's current balances + history.
 // This is what hydrates the app on load so state survives reloads and devices.
@@ -18,7 +19,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const txns = await loadTxns(userId)
     const referral = await loadReferral(userId)
     const stats = await loadStats()
-    return res.status(200).json({ account, txns, referral, stats })
+    const isAdmin = await isAdminUser(userId)
+    return res.status(200).json({ account, txns, referral, stats, isAdmin })
   } catch (e) {
     console.error('[moola] account error:', e)
     return res.status(500).json({ error: 'Could not load your account' })
