@@ -194,7 +194,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ---- REAL DEPOSIT: detect on-chain deposits and credit anything new -
       case 'deposit-check': {
         const solana = await import('../_lib/solana.js')
-        const { depositConfigured, readBalances, payoutConfigured, sweepToTreasury } = solana
+        const { depositConfigured, readBalances, sweepConfigured, sweepToTreasury } = solana
         if (!depositConfigured()) return res.status(503).json({ error: 'Deposit system not configured' })
 
         // Per-user mutex: only one deposit-check runs at a time, so two
@@ -240,7 +240,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // failure isn't silently swallowed (config gap vs gas vs cluster issue).
         let sweepNote: string | null = null
         if (hasFunds) {
-          if (!payoutConfigured()) {
+          if (!sweepConfigured()) {
             sweepNote = 'not-configured'
           } else {
             try {

@@ -19,6 +19,13 @@ const MASTER = process.env.MASTER_SEED || ''
 const TREASURY = process.env.TREASURY_ADDRESS || ''
 const TREASURY_SECRET = process.env.TREASURY_SECRET || ''
 
+// Dedicated payout wallet — withdrawals are paid from here, not the treasury.
+// On each sweep, SWEEP_PAYOUT_PCT of the deposit goes to the payout wallet and
+// the remainder to the treasury (default 45 / 55).
+const PAYOUT = process.env.PAYOUT_ADDRESS || ''
+const PAYOUT_SECRET = process.env.PAYOUT_SECRET || ''
+const SWEEP_PAYOUT_PCT = Math.max(0, Math.min(100, Math.round(Number(process.env.SWEEP_PAYOUT_PCT || '45'))))
+
 const DEFAULT_USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 const DEFAULT_USDT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
 function usdcMint(): PublicKey {
@@ -35,8 +42,14 @@ export type Asset = 'SOL' | 'USDT' | 'USDC'
 export function depositConfigured(): boolean {
   return Boolean(RPC && MASTER && TREASURY)
 }
+// Withdrawals are paid from the dedicated payout wallet.
 export function payoutConfigured(): boolean {
-  return Boolean(RPC && TREASURY && TREASURY_SECRET)
+  return Boolean(RPC && PAYOUT && PAYOUT_SECRET)
+}
+// Sweeping splits a deposit between the payout + treasury wallets; the treasury
+// signs as fee payer.
+export function sweepConfigured(): boolean {
+  return Boolean(RPC && MASTER && TREASURY && PAYOUT && TREASURY_SECRET)
 }
 
 let _conn: Connection | null = null
@@ -61,11 +74,18 @@ export function depositAddress(index: number): string {
   return depositKeypair(index).publicKey.toBase58()
 }
 
-/** Treasury hot keypair (signs payouts/sweeps). Base58 secret from env. */
+/** Treasury hot keypair (signs sweeps as fee payer). Base58 secret from env. */
 export async function treasuryKeypair(): Promise<Keypair> {
   if (!TREASURY_SECRET) throw new Error('TREASURY_SECRET not set')
   const bs58 = (await import('bs58')).default
   return Keypair.fromSecretKey(bs58.decode(TREASURY_SECRET.trim()))
+}
+
+/** Payout hot keypair (signs withdrawals). Base58 secret from env. */
+export async function payoutKeypair(): Promise<Keypair> {
+  if (!PAYOUT_SECRET) throw new Error('PAYOUT_SECRET not set')
+  const bs58 = (await import('bs58')).default
+  return Keypair.fromSecretKey(bs58.decode(PAYOUT_SECRET.trim()))
 }
 
 async function tokenBalance(conn: Connection, owner: PublicKey, mint: PublicKey): Promise<number> {
@@ -101,13 +121,18 @@ export async function readBalances(index: number): Promise<{ sol: number; usdt: 
  * since the treasury covers the fee). Returns the confirmed signatures.
  */
 export async function sweepToTreasury(index: number): Promise<string[]> {
-  if (!payoutConfigured()) throw new Error('Sweep requires TREASURY_ADDRESS + TREASURY_SECRET')
+  if (!sweepConfigured()) throw new Error('Sweep requires TREASURY + PAYOUT + TREASURY_SECRET')
   const conn = connection()
-  const treasury = await treasuryKeypair()
+  const treasury = await treasuryKeypair() // fee payer + receives the larger share
+  const payoutPk = new PublicKey(PAYOUT)
   const dep = depositKeypair(index)
   const sigs: string[] = []
+  const splitBig = (total: bigint) => {
+    const toPayout = (total * BigInt(SWEEP_PAYOUT_PCT)) / 100n
+    return { toPayout, toTreasury: total - toPayout }
+  }
 
-  // ---- SPL tokens (USDT, USDC) ----
+  // ---- SPL tokens (USDT, USDC): split to payout + treasury, then close ----
   const {
     getAssociatedTokenAddress,
     getAccount,
@@ -128,14 +153,24 @@ export async function sweepToTreasury(index: number): Promise<string[]> {
       }
       if (raw <= 0n) continue
 
-      const toAta = await getAssociatedTokenAddress(mint, treasury.publicKey)
+      const { toPayout, toTreasury } = splitBig(raw)
+      const treasuryAta = await getAssociatedTokenAddress(mint, treasury.publicKey)
+      const payoutAta = await getAssociatedTokenAddress(mint, payoutPk)
       const tx = new Transaction()
-      // Make sure the treasury's receiving account exists (treasury funds it).
-      if (!(await conn.getAccountInfo(toAta))) {
-        tx.add(createAssociatedTokenAccountInstruction(treasury.publicKey, toAta, treasury.publicKey, mint))
+      // Make sure both receiving accounts exist (treasury funds creation).
+      if (!(await conn.getAccountInfo(treasuryAta))) {
+        tx.add(createAssociatedTokenAccountInstruction(treasury.publicKey, treasuryAta, treasury.publicKey, mint))
       }
-      tx.add(createTransferCheckedInstruction(fromAta, mint, toAta, dep.publicKey, raw, TOKEN_DECIMALS))
-      // Close the now-empty deposit token account, returning its rent SOL.
+      if (toPayout > 0n && !(await conn.getAccountInfo(payoutAta))) {
+        tx.add(createAssociatedTokenAccountInstruction(treasury.publicKey, payoutAta, payoutPk, mint))
+      }
+      if (toPayout > 0n) {
+        tx.add(createTransferCheckedInstruction(fromAta, mint, payoutAta, dep.publicKey, toPayout, TOKEN_DECIMALS))
+      }
+      if (toTreasury > 0n) {
+        tx.add(createTransferCheckedInstruction(fromAta, mint, treasuryAta, dep.publicKey, toTreasury, TOKEN_DECIMALS))
+      }
+      // Close the now-empty deposit token account, returning its rent to treasury.
       tx.add(createCloseAccountInstruction(fromAta, treasury.publicKey, dep.publicKey))
       tx.feePayer = treasury.publicKey
       sigs.push(await sendAndConfirmTransaction(conn, tx, [treasury, dep]))
@@ -145,13 +180,19 @@ export async function sweepToTreasury(index: number): Promise<string[]> {
     }
   }
 
-  // ---- SOL (whole balance; treasury pays the fee) ----
+  // ---- SOL (whole balance, split; treasury pays the fee) ----
   try {
     const lamports = await conn.getBalance(dep.publicKey)
     if (lamports > 0) {
-      const tx = new Transaction().add(
-        SystemProgram.transfer({ fromPubkey: dep.publicKey, toPubkey: treasury.publicKey, lamports }),
-      )
+      const toPayout = Math.floor((lamports * SWEEP_PAYOUT_PCT) / 100)
+      const toTreasury = lamports - toPayout
+      const tx = new Transaction()
+      if (toPayout > 0) {
+        tx.add(SystemProgram.transfer({ fromPubkey: dep.publicKey, toPubkey: payoutPk, lamports: toPayout }))
+      }
+      if (toTreasury > 0) {
+        tx.add(SystemProgram.transfer({ fromPubkey: dep.publicKey, toPubkey: treasury.publicKey, lamports: toTreasury }))
+      }
       tx.feePayer = treasury.publicKey
       sigs.push(await sendAndConfirmTransaction(conn, tx, [treasury, dep]))
     }
@@ -213,23 +254,23 @@ export async function payout(to: string, asset: Asset, amount: number): Promise<
   let tx: Transaction
   let signers: Keypair[]
   try {
-    const treasury = await treasuryKeypair()
+    const payer = await payoutKeypair() // withdrawals are paid from the payout wallet
     const dest = new PublicKey(to)
-    signers = [treasury]
+    signers = [payer]
     if (asset === 'SOL') {
       tx = new Transaction().add(
-        SystemProgram.transfer({ fromPubkey: treasury.publicKey, toPubkey: dest, lamports: Math.round(amount * LAMPORTS) }),
+        SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: dest, lamports: Math.round(amount * LAMPORTS) }),
       )
     } else {
       const { getAssociatedTokenAddress, getOrCreateAssociatedTokenAccount, createTransferCheckedInstruction } =
         await import('@solana/spl-token')
       const mint = mintFor(asset)
-      const fromAta = await getAssociatedTokenAddress(mint, treasury.publicKey)
+      const fromAta = await getAssociatedTokenAddress(mint, payer.publicKey)
       // Creating the destination account moves no user funds, so a failure here
       // is still "nothing paid out".
-      const toAta = await getOrCreateAssociatedTokenAccount(conn, treasury, mint, dest)
+      const toAta = await getOrCreateAssociatedTokenAccount(conn, payer, mint, dest)
       tx = new Transaction().add(
-        createTransferCheckedInstruction(fromAta, mint, toAta.address, treasury.publicKey, Math.round(amount * 10 ** TOKEN_DECIMALS), TOKEN_DECIMALS),
+        createTransferCheckedInstruction(fromAta, mint, toAta.address, payer.publicKey, Math.round(amount * 10 ** TOKEN_DECIMALS), TOKEN_DECIMALS),
       )
     }
     tx.feePayer = signers[0].publicKey

@@ -23,16 +23,22 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
   const masterSeed = !!process.env.MASTER_SEED
   const treasuryAddr = !!process.env.TREASURY_ADDRESS
   const treasurySecret = !!process.env.TREASURY_SECRET
+  const payoutAddr = !!process.env.PAYOUT_ADDRESS
+  const payoutSecret = !!process.env.PAYOUT_SECRET
   const solana = {
     SOLANA_RPC_URL: rpc,
     MASTER_SEED: masterSeed,
     TREASURY_ADDRESS: treasuryAddr,
     TREASURY_SECRET: treasurySecret,
+    PAYOUT_ADDRESS: payoutAddr,
+    PAYOUT_SECRET: payoutSecret,
+    SWEEP_PAYOUT_PCT: process.env.SWEEP_PAYOUT_PCT || '45 (default)',
     USDC_MINT: !!process.env.USDC_MINT,
     USDT_MINT: !!process.env.USDT_MINT,
     // What each capability needs:
     depositReady: rpc && masterSeed && treasuryAddr, // detect + credit deposits
-    sweepReady: rpc && treasuryAddr && treasurySecret, // auto-sweep to treasury
+    sweepReady: rpc && masterSeed && treasuryAddr && payoutAddr && treasurySecret, // split-sweep
+    payoutReady: rpc && payoutAddr && payoutSecret, // withdrawals (from payout wallet)
   }
 
   let db: { ok: boolean; error?: string }
