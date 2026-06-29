@@ -154,14 +154,14 @@ export default function Home({ v }: { v: MoolaVals }) {
       <div style={css('margin-bottom:34px')}>
         <div style={css('font-size:12px;letter-spacing:2px;color:#23d39a;font-weight:700;margin-bottom:6px')}>TOKENOMICS</div>
         <h2 style={css('font-size:25px;font-weight:800;margin:0 0 6px;letter-spacing:-.4px')}>1,000,000,000 $MOOLA</h2>
-        <p style={css('font-size:13px;color:#92b8a3;margin:0 0 20px;line-height:1.6')}>Fixed supply. 70% to the community presale. No team unlocks for 12 months.</p>
+        <p style={css('font-size:13px;color:#92b8a3;margin:0 0 20px;line-height:1.6')}>Fixed supply. 70% to the community presale &amp; airdrop. No team unlocks for 12 months.</p>
         <div style={css('border-radius:20px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);padding:22px 18px')}>
           <div style={css('display:flex;align-items:center;gap:20px;justify-content:center')}>
             <div style={css('position:relative;width:130px;height:130px;flex-shrink:0;border-radius:50%;background:conic-gradient(#23d39a 0 70%,#f2b34e 70% 85%,#ff9d3c 85% 95%,#7fe0a0 95% 100%);box-shadow:0 0 30px rgba(35,211,154,.3)')}>
               <div style={css('position:absolute;inset:26px;border-radius:50%;background:#0a1d14;display:flex;flex-direction:column;align-items:center;justify-content:center')}><div style={css('font-size:13px;font-weight:800;color:#23d39a')}>1B</div><div style={css('font-size:9px;color:#92b8a3')}>SUPPLY</div></div>
             </div>
             <div style={css('font-size:13px;line-height:1;display:flex;flex-direction:column;gap:13px')}>
-              <div style={css('display:flex;align-items:center;gap:9px')}><span style={css('width:11px;height:11px;border-radius:3px;background:#23d39a')}></span><div><b>Presale 70%</b><div style={css('font-size:11px;color:#92b8a3;margin-top:2px')}>700,000,000</div></div></div>
+              <div style={css('display:flex;align-items:center;gap:9px')}><span style={css('width:11px;height:11px;border-radius:3px;background:#23d39a')}></span><div><b>Presale &amp; Airdrop 70%</b><div style={css('font-size:11px;color:#92b8a3;margin-top:2px')}>700,000,000</div></div></div>
               <div style={css('display:flex;align-items:center;gap:9px')}><span style={css('width:11px;height:11px;border-radius:3px;background:#f2b34e')}></span><div><b>Exchanges 15%</b><div style={css('font-size:11px;color:#92b8a3;margin-top:2px')}>150,000,000</div></div></div>
               <div style={css('display:flex;align-items:center;gap:9px')}><span style={css('width:11px;height:11px;border-radius:3px;background:#ff9d3c')}></span><div><b>Marketing 10%</b><div style={css('font-size:11px;color:#92b8a3;margin-top:2px')}>100,000,000</div></div></div>
               <div style={css('display:flex;align-items:center;gap:9px')}><span style={css('width:11px;height:11px;border-radius:3px;background:#7fe0a0')}></span><div><b>Ecosystem 5%</b><div style={css('font-size:11px;color:#92b8a3;margin-top:2px')}>50,000,000</div></div></div>
