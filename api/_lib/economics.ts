@@ -11,6 +11,10 @@ export const PRESALE_PRICE = 0.01 // $0.01 per $MOOLA — the buy rate
 // (0.0095 / 0.01 = 0.95, so the platform keeps 5% on every sell.)
 export const SELL_PRICE = 0.0095
 export const SELL_FEE_PCT = 5 // platform take on each sell (the buy↔sell spread)
+// Withdrawal fee: the full requested amount leaves the user's balance, but only
+// (100 - WITHDRAW_FEE_PCT)% is paid on-chain to their wallet. The rest is the
+// platform's fee (kept in the payout wallet).
+export const WITHDRAW_FEE_PCT = 5
 export const SOL_PRICE = 152 // illustrative SOL price used for sell quotes
 export const AIRDROP_AMOUNT = 200 // $MOOLA granted on airdrop claim
 

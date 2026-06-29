@@ -985,6 +985,9 @@ export function useMoola() {
     wdAddr: s.wdAddr,
     withdrawing: s.withdrawing,
     wdBalStr: fmt(s.wdAsset === 'SOL' ? s.sol : s.wdAsset === 'USDT' ? s.usdt : s.usdc, s.wdAsset === 'SOL' ? 4 : 2),
+    // Net the user actually receives after the 5% withdrawal fee.
+    wdRecvStr:
+      fmt((parseFloat(s.wdAmt) || 0) * 0.95, s.wdAsset === 'SOL' ? 4 : 2) + ' ' + s.wdAsset,
     openWithdraw: () =>
       set({
         withdraw: true,
