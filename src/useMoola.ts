@@ -43,6 +43,7 @@ interface MoolaState {
   depCopied: boolean
   sell: boolean
   sellAmt: string
+  sellAsset: 'SOL' | 'USDT' | 'USDC'
   withdraw: boolean
   wdAsset: 'SOL' | 'USDT' | 'USDC'
   wdAmt: string
@@ -115,6 +116,7 @@ const initialState: MoolaState = {
   depCopied: false,
   sell: false,
   sellAmt: '',
+  sellAsset: 'SOL',
   withdraw: false,
   wdAsset: 'SOL',
   wdAmt: '',
@@ -600,14 +602,15 @@ export function useMoola() {
 
   const doSell = async () => {
     const amt = parseFloat(stateRef.current.sellAmt)
+    const asset = stateRef.current.sellAsset
     if (!amt || amt <= 0) return flash('Enter an amount to sell')
     if (amt < 50) return flash('Minimum sell is 50 $MOOLA')
     if (amt > stateRef.current.available) return flash('Insufficient available balance')
     try {
-      const r = await api.action('sell', { amount: amt })
+      const r = await api.action('sell', { amount: amt, asset })
       applyAccount(r.account, r.txns)
       set({ sell: false, sellAmt: '' })
-      flash('✅ Sold ' + fmt(amt, 0) + ' $MOOLA')
+      flash('✅ Sold ' + fmt(amt, 0) + ' $MOOLA → ' + asset)
     } catch (e) {
       flash(errMsg(e))
     }
@@ -877,7 +880,13 @@ export function useMoola() {
     // sell
     sell: s.sell,
     sellAmt: s.sellAmt,
+    sellAsset: s.sellAsset,
     sellSolStr: (((parseFloat(s.sellAmt) || 0) * 0.01) / 152).toFixed(4),
+    sellRecvStr:
+      s.sellAsset === 'SOL'
+        ? (((parseFloat(s.sellAmt) || 0) * 0.01) / 152).toFixed(4) + ' SOL'
+        : fmt((parseFloat(s.sellAmt) || 0) * 0.01, 2) + ' ' + s.sellAsset,
+    setSellAsset: (a: 'SOL' | 'USDT' | 'USDC') => set({ sellAsset: a }),
     openSell: () => set({ sell: true, wallet: false }),
     closeSell: () => set({ sell: false }),
     onSellAmt: onInput('sellAmt'),

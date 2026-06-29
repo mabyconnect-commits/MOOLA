@@ -226,15 +226,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ---- SELL -----------------------------------------------------------
       case 'sell': {
         const amt = Number(body.amount)
+        const out: Asset = body.asset === 'USDT' ? 'USDT' : body.asset === 'USDC' ? 'USDC' : 'SOL'
         if (!amt || amt <= 0) return res.status(400).json({ error: 'Enter an amount to sell' })
         if (amt < 50) return res.status(400).json({ error: 'Minimum sell is 50 $MOOLA' })
         if (amt > a.available) return res.status(400).json({ error: 'Insufficient available balance' })
-        const sol = (amt * PRESALE_PRICE) / SOL_PRICE
+        const usd = amt * PRESALE_PRICE // $0.01 per $MOOLA
         a.available -= amt
         a.balance -= amt
-        a.sol += sol
+        let recvStr: string
+        if (out === 'SOL') {
+          const sol = usd / SOL_PRICE
+          a.sol += sol
+          recvStr = `${sol.toFixed(4)} SOL`
+        } else if (out === 'USDT') {
+          a.usdt += usd // USDT ≈ $1
+          recvStr = `${fmt(usd, 2)} USDT`
+        } else {
+          a.usdc += usd // USDC ≈ $1
+          recvStr = `${fmt(usd, 2)} USDC`
+        }
         await saveAccount(userId, a)
-        await addTxn(userId, { icon: '💱', title: 'Sold $MOOLA', sub: `${fmt(amt, 0)} $MOOLA`, amt: `+${sol.toFixed(4)} SOL`, pos: true })
+        await addTxn(userId, { icon: '💱', title: 'Sold $MOOLA', sub: `${fmt(amt, 0)} $MOOLA`, amt: `+${recvStr}`, pos: true })
         break
       }
 

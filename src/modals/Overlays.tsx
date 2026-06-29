@@ -275,6 +275,12 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               <span style={css('font-size:19px;font-weight:800')}>Sell $MOOLA</span>
               <div onClick={v.closeSell} style={css('width:32px;height:32px;border-radius:50%;background:rgba(6,22,14,.6);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer')}>✕</div>
             </div>
+            <div style={css('font-size:13px;color:#92b8a3;margin-bottom:7px')}>Receive in</div>
+            <div style={css('display:flex;gap:8px;padding:5px;border-radius:14px;background:rgba(8,16,38,.5);border:1px solid rgba(110,200,150,.16);margin-bottom:14px')}>
+              {(['SOL', 'USDT', 'USDC'] as const).map((c) => (
+                <div key={c} onClick={() => v.setSellAsset(c)} style={css('flex:1;text-align:center;padding:9px;border-radius:11px;font-weight:700;font-size:13.5px;cursor:pointer;' + (v.sellAsset === c ? 'background:linear-gradient(120deg,#f2b34e,#ff9d3c);color:#2a1a06' : 'color:#9fc4ad'))}>{c}</div>
+              ))}
+            </div>
             <div style={css('display:flex;justify-content:space-between;font-size:13px;color:#92b8a3;margin-bottom:7px')}>
               <span>Amount to sell</span><span>Available: <b style={css('color:#cfe7da')}>{v.availStr}</b></span>
             </div>
@@ -288,9 +294,9 @@ export default function Overlays({ v }: { v: MoolaVals }) {
                 <div style={css('width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#9945ff,#14f195);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff')}>◎</div>
                 <span style={css('font-size:13.5px;color:#92b8a3')}>You receive</span>
               </div>
-              <span style={css('font-size:18px;font-weight:800;color:#f2b34e')}>{v.sellSolStr} SOL</span>
+              <span style={css('font-size:18px;font-weight:800;color:#f2b34e')}>{v.sellRecvStr}</span>
             </div>
-            <div onClick={v.doSell} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#f2b34e,#ff9d3c);color:#2a1a06;font-weight:800;font-size:16px;cursor:pointer')}>Sell to SOL</div>
+            <div onClick={v.doSell} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#f2b34e,#ff9d3c);color:#2a1a06;font-weight:800;font-size:16px;cursor:pointer')}>Sell to {v.sellAsset}</div>
             <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Only unstaked $MOOLA can be sold · Min 50 $MOOLA · Sell fee 7%</div>
           </div>
         </div>
