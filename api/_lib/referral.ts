@@ -134,4 +134,18 @@ export async function distributeCommission(buyerId: number, tokens: number): Pro
   await sql`
     INSERT INTO referral_earnings (beneficiary, from_user, level, buy_tokens, commission)
     SELECT * FROM unnest(${ids}::bigint[], ${fromUsers}::bigint[], ${levels}::int[], ${buyTokens}::float8[], ${amts}::float8[])`
+
+  // Drop a notification into each beneficiary's activity feed so referral
+  // commission is visible there, not just in the referral breakdown.
+  const types = ids.map(() => 'Referral commission')
+  const icons = ids.map(() => '🤝')
+  const titles = ids.map(() => 'Referral commission')
+  const subs = levels.map((l) => `Level ${l} · from a referral's buy`)
+  const amtStrs = amts.map((a) => `+${fmt(a, 3)} $MOOLA`)
+  const poss = ids.map(() => true)
+  await sql`
+    INSERT INTO transactions (user_id, type, icon, title, sub, amt, pos)
+    SELECT * FROM unnest(
+      ${ids}::bigint[], ${types}::text[], ${icons}::text[], ${titles}::text[],
+      ${subs}::text[], ${amtStrs}::text[], ${poss}::boolean[])`
 }
