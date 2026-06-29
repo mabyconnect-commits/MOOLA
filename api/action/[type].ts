@@ -249,7 +249,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const waddr = String(body.address || '').trim()
         if (!wamt || wamt <= 0) return res.status(400).json({ error: 'Enter an amount to withdraw' })
         if (!SOLANA_ADDR_RE.test(waddr)) return res.status(400).json({ error: 'Enter a valid Solana address' })
-        const MIN: Record<Asset, number> = { SOL: 0.01, USDT: 1, USDC: 1 }
+        // SOL min sits just above Solana's rent-exempt floor (~0.00089) so a
+        // transfer to a brand-new wallet still succeeds.
+        const MIN: Record<Asset, number> = { SOL: 0.001, USDT: 0.5, USDC: 0.5 }
         if (wamt < MIN[wasset]) {
           return res.status(400).json({ error: `Minimum withdrawal is ${MIN[wasset]} ${wasset}` })
         }
