@@ -588,7 +588,7 @@ export function useMoola() {
       const r = await api.action('withdraw', { asset: cur.wdAsset, amount: amt, address: addr })
       if (r.account) applyAccount(r.account, r.txns)
       set({ withdraw: false, wdAmt: '', wdAddr: '' })
-      flash('✅ Withdrawal sent to your wallet')
+      flash(r.pending ? '⏳ Withdrawal processing — it should arrive shortly' : '✅ Withdrawal sent to your wallet')
     } catch (e) {
       flash(errMsg(e))
     } finally {

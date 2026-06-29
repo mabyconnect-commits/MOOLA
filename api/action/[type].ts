@@ -278,13 +278,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           sig = await solana.payout(waddr, wasset, wamt)
         } catch (e) {
-          // Payout didn't go out — refund the reserved balance so nothing is lost.
+          const pe = e as { broadcast?: boolean; signature?: string; message?: string }
+          if (pe.broadcast) {
+            // Ambiguous — the payout may have landed on-chain. NEVER refund here,
+            // or the user could be paid twice. Hold the (already-deducted) balance
+            // and mark the withdrawal pending for reconciliation.
+            await sql`UPDATE withdrawals SET status = 'pending', signature = ${pe.signature ?? null} WHERE id = ${withdrawalId}`
+            const account = await loadAccount(userId)
+            const txns = await loadTxns(userId)
+            return res.status(200).json({
+              account,
+              txns,
+              pending: true,
+              error: "Your withdrawal is processing and should arrive shortly. If it doesn't, contact support — your balance is held safely.",
+            })
+          }
+          // Provably not broadcast → nothing was paid out → safe to refund.
           if (wasset === 'SOL') await sql`UPDATE accounts SET sol = sol + ${wamt} WHERE user_id = ${userId}`
           else if (wasset === 'USDT') await sql`UPDATE accounts SET usdt = usdt + ${wamt} WHERE user_id = ${userId}`
           else await sql`UPDATE accounts SET usdc = usdc + ${wamt} WHERE user_id = ${userId}`
           await sql`UPDATE withdrawals SET status = 'failed' WHERE id = ${withdrawalId}`
-          console.error('[moola] withdraw payout failed:', e)
-          return res.status(502).json({ error: 'Withdrawal failed: ' + (e instanceof Error ? e.message : String(e)) })
+          console.error('[moola] withdraw payout failed (safe refund):', e)
+          return res.status(502).json({ error: 'Withdrawal failed: ' + (pe.message || 'please try again') })
         }
 
         await sql`UPDATE withdrawals SET status = 'sent', signature = ${sig} WHERE id = ${withdrawalId}`
