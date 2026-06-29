@@ -227,6 +227,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'sell': {
         const amt = Number(body.amount)
         if (!amt || amt <= 0) return res.status(400).json({ error: 'Enter an amount to sell' })
+        if (amt < 50) return res.status(400).json({ error: 'Minimum sell is 50 $MOOLA' })
         if (amt > a.available) return res.status(400).json({ error: 'Insufficient available balance' })
         const sol = (amt * PRESALE_PRICE) / SOL_PRICE
         a.available -= amt
@@ -234,6 +235,66 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.sol += sol
         await saveAccount(userId, a)
         await addTxn(userId, { icon: '💱', title: 'Sold $MOOLA', sub: `${fmt(amt, 0)} $MOOLA`, amt: `+${sol.toFixed(4)} SOL`, pos: true })
+        break
+      }
+
+      // ---- WITHDRAW (on-chain payout from treasury) -----------------------
+      case 'withdraw': {
+        const solana = await import('../_lib/solana.js')
+        if (!solana.payoutConfigured()) {
+          return res.status(503).json({ error: 'Withdrawals are not available yet.' })
+        }
+        const wasset: Asset = body.asset === 'USDC' ? 'USDC' : body.asset === 'USDT' ? 'USDT' : 'SOL'
+        const wamt = Number(body.amount)
+        const waddr = String(body.address || '').trim()
+        if (!wamt || wamt <= 0) return res.status(400).json({ error: 'Enter an amount to withdraw' })
+        if (!SOLANA_ADDR_RE.test(waddr)) return res.status(400).json({ error: 'Enter a valid Solana address' })
+        const MIN: Record<Asset, number> = { SOL: 0.01, USDT: 1, USDC: 1 }
+        if (wamt < MIN[wasset]) {
+          return res.status(400).json({ error: `Minimum withdrawal is ${MIN[wasset]} ${wasset}` })
+        }
+
+        // Atomically reserve the funds: the deduction only succeeds if the
+        // balance covers it, so concurrent requests can't overdraw the wallet.
+        let reserved = false
+        if (wasset === 'SOL') {
+          const r = await sql`UPDATE accounts SET sol = sol - ${wamt} WHERE user_id = ${userId} AND sol >= ${wamt} RETURNING user_id`
+          reserved = r.rows.length > 0
+        } else if (wasset === 'USDT') {
+          const r = await sql`UPDATE accounts SET usdt = usdt - ${wamt} WHERE user_id = ${userId} AND usdt >= ${wamt} RETURNING user_id`
+          reserved = r.rows.length > 0
+        } else {
+          const r = await sql`UPDATE accounts SET usdc = usdc - ${wamt} WHERE user_id = ${userId} AND usdc >= ${wamt} RETURNING user_id`
+          reserved = r.rows.length > 0
+        }
+        if (!reserved) return res.status(400).json({ error: `Insufficient ${wasset} balance` })
+
+        const wid = await sql<{ id: number }>`
+          INSERT INTO withdrawals (user_id, asset, amount, address, status)
+          VALUES (${userId}, ${wasset}, ${wamt}, ${waddr}, 'pending') RETURNING id`
+        const withdrawalId = wid.rows[0]?.id
+
+        let sig: string
+        try {
+          sig = await solana.payout(waddr, wasset, wamt)
+        } catch (e) {
+          // Payout didn't go out — refund the reserved balance so nothing is lost.
+          if (wasset === 'SOL') await sql`UPDATE accounts SET sol = sol + ${wamt} WHERE user_id = ${userId}`
+          else if (wasset === 'USDT') await sql`UPDATE accounts SET usdt = usdt + ${wamt} WHERE user_id = ${userId}`
+          else await sql`UPDATE accounts SET usdc = usdc + ${wamt} WHERE user_id = ${userId}`
+          await sql`UPDATE withdrawals SET status = 'failed' WHERE id = ${withdrawalId}`
+          console.error('[moola] withdraw payout failed:', e)
+          return res.status(502).json({ error: 'Withdrawal failed: ' + (e instanceof Error ? e.message : String(e)) })
+        }
+
+        await sql`UPDATE withdrawals SET status = 'sent', signature = ${sig} WHERE id = ${withdrawalId}`
+        await addTxn(userId, {
+          icon: '🏧',
+          title: `Withdrew ${wasset}`,
+          sub: `${waddr.slice(0, 4)}…${waddr.slice(-4)}`,
+          amt: `-${fmt(wamt, wasset === 'SOL' ? 4 : 2)} ${wasset}`,
+          pos: false,
+        })
         break
       }
 

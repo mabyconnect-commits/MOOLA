@@ -125,6 +125,21 @@ export function ensureSchema(): Promise<void> {
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS staked_at TIMESTAMPTZ`
       await sql`UPDATE accounts SET staked_at = reward_updated_at WHERE staked_at IS NULL AND staked > 0`
 
+      // ---- Withdrawals audit log (on-chain payouts from the treasury) ----
+      await sql`
+        CREATE TABLE IF NOT EXISTS withdrawals (
+          id         BIGSERIAL PRIMARY KEY,
+          user_id    BIGINT NOT NULL,
+          asset      TEXT NOT NULL,
+          amount     DOUBLE PRECISION NOT NULL,
+          address    TEXT NOT NULL,
+          status     TEXT NOT NULL DEFAULT 'pending',
+          signature  TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `
+      await sql`CREATE INDEX IF NOT EXISTS withdrawals_user_idx ON withdrawals(user_id)`
+
       // ---- One-time pre-launch test-data wipe ----
       // Clears fake balances created by the old simulated deposit/buy. Runs
       // exactly once (tracked in app_meta), automatically on deploy.

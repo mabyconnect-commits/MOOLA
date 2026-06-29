@@ -43,6 +43,11 @@ interface MoolaState {
   depCopied: boolean
   sell: boolean
   sellAmt: string
+  withdraw: boolean
+  wdAsset: 'SOL' | 'USDT' | 'USDC'
+  wdAmt: string
+  wdAddr: string
+  withdrawing: boolean
   minted: number
   history: boolean
   settings: boolean
@@ -110,6 +115,11 @@ const initialState: MoolaState = {
   depCopied: false,
   sell: false,
   sellAmt: '',
+  withdraw: false,
+  wdAsset: 'SOL',
+  wdAmt: '',
+  wdAddr: '',
+  withdrawing: false,
   minted: 0,
   history: false,
   settings: false,
@@ -550,6 +560,7 @@ export function useMoola() {
   const doSell = async () => {
     const amt = parseFloat(stateRef.current.sellAmt)
     if (!amt || amt <= 0) return flash('Enter an amount to sell')
+    if (amt < 50) return flash('Minimum sell is 50 $MOOLA')
     if (amt > stateRef.current.available) return flash('Insufficient available balance')
     try {
       const r = await api.action('sell', { amount: amt })
@@ -558,6 +569,30 @@ export function useMoola() {
       flash('✅ Sold ' + fmt(amt, 0) + ' $MOOLA')
     } catch (e) {
       flash(errMsg(e))
+    }
+  }
+
+  // Withdraw in-app SOL/USDT/USDC to the user's own Solana wallet (on-chain
+  // payout from the treasury).
+  const doWithdraw = async () => {
+    const cur = stateRef.current
+    if (cur.withdrawing) return
+    const amt = parseFloat(cur.wdAmt)
+    const addr = cur.wdAddr.trim()
+    if (!amt || amt <= 0) return flash('Enter an amount to withdraw')
+    if (addr.length < 32) return flash('Enter your Solana wallet address')
+    const bal = cur.wdAsset === 'SOL' ? cur.sol : cur.wdAsset === 'USDT' ? cur.usdt : cur.usdc
+    if (amt > bal) return flash('Insufficient ' + cur.wdAsset + ' balance')
+    set({ withdrawing: true })
+    try {
+      const r = await api.action('withdraw', { asset: cur.wdAsset, amount: amt, address: addr })
+      if (r.account) applyAccount(r.account, r.txns)
+      set({ withdraw: false, wdAmt: '', wdAddr: '' })
+      flash('✅ Withdrawal sent to your wallet')
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ withdrawing: false })
     }
   }
 
@@ -807,6 +842,21 @@ export function useMoola() {
     onSellAmt: onInput('sellAmt'),
     setMaxSell: () => set({ sellAmt: String(stateRef.current.available) }),
     doSell,
+    // withdraw (on-chain payout to the user's wallet)
+    withdraw: s.withdraw,
+    wdAsset: s.wdAsset,
+    wdAmt: s.wdAmt,
+    wdAddr: s.wdAddr,
+    withdrawing: s.withdrawing,
+    wdBalStr: fmt(s.wdAsset === 'SOL' ? s.sol : s.wdAsset === 'USDT' ? s.usdt : s.usdc, s.wdAsset === 'SOL' ? 4 : 2),
+    openWithdraw: () => set({ withdraw: true, wallet: false }),
+    closeWithdraw: () => set({ withdraw: false }),
+    setWdAsset: (a: 'SOL' | 'USDT' | 'USDC') => set({ wdAsset: a, wdAmt: '' }),
+    onWdAmt: onInput('wdAmt'),
+    onWdAddr: onInput('wdAddr'),
+    setMaxWithdraw: () =>
+      set((st) => ({ wdAmt: String(st.wdAsset === 'SOL' ? st.sol : st.wdAsset === 'USDT' ? st.usdt : st.usdc) })),
+    doWithdraw,
     claimAirdrop,
     confirmClaim,
     copyRef,

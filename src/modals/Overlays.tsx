@@ -44,11 +44,12 @@ export default function Overlays({ v }: { v: MoolaVals }) {
                 <div onClick={() => v.openDeposit('USDC')} style={css('padding:7px 16px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Deposit</div>
               </div>
             </div>
-            <div style={css('display:flex;gap:11px;margin-bottom:18px')}>
+            <div style={css('display:flex;gap:11px;margin-bottom:11px')}>
               <div onClick={v.goPresale} style={css('flex:1;text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;cursor:pointer')}>↓ Buy</div>
               <div onClick={v.openSell} style={css('flex:1;text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#f2b34e,#ff9d3c);color:#2a1a06;font-weight:800;cursor:pointer')}>↑ Sell</div>
               <div onClick={v.openStakeForm} style={css('flex:1;text-align:center;padding:14px;border-radius:14px;border:1px solid rgba(110,200,150,.3);color:#cfe7da;font-weight:700;cursor:pointer')}>⊕ Stake</div>
             </div>
+            <div onClick={v.openWithdraw} style={css('text-align:center;padding:13px;border-radius:14px;border:1px solid rgba(110,200,150,.3);color:#9fefc6;font-weight:700;cursor:pointer;margin-bottom:18px')}>🏧 Withdraw to wallet</div>
             <div style={css('font-size:13px;color:#92b8a3;margin-bottom:9px')}>Deposit network</div>
             <div style={css('display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:13px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.16)')}>
               <div style={css('width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#9945ff,#14f195);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff')}>◎</div>
@@ -290,7 +291,42 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               <span style={css('font-size:18px;font-weight:800;color:#f2b34e')}>{v.sellSolStr} SOL</span>
             </div>
             <div onClick={v.doSell} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#f2b34e,#ff9d3c);color:#2a1a06;font-weight:800;font-size:16px;cursor:pointer')}>Sell to SOL</div>
-            <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Only unstaked $MOOLA can be sold · Sell fee 7%</div>
+            <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Only unstaked $MOOLA can be sold · Min 50 $MOOLA · Sell fee 7%</div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== WITHDRAW ===== */}
+      {v.withdraw && (
+        <div onClick={v.closeWithdraw} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.7);display:flex;justify-content:center;align-items:flex-end')}>
+          <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 30px;max-height:92dvh;overflow-y:auto;animation:riseIn .3s ease')}>
+            <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
+            <div style={css('display:flex;justify-content:space-between;align-items:center;margin-bottom:16px')}>
+              <span style={css('font-size:19px;font-weight:800')}>Withdraw to wallet</span>
+              <div onClick={v.closeWithdraw} style={css('width:32px;height:32px;border-radius:50%;background:rgba(6,22,14,.6);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer')}>✕</div>
+            </div>
+
+            {/* asset toggle */}
+            <div style={css('display:flex;gap:8px;padding:5px;border-radius:14px;background:rgba(8,16,38,.5);border:1px solid rgba(110,200,150,.16);margin-bottom:14px')}>
+              {(['SOL', 'USDT', 'USDC'] as const).map((c) => (
+                <div key={c} onClick={() => v.setWdAsset(c)} style={css('flex:1;text-align:center;padding:9px;border-radius:11px;font-weight:700;font-size:13.5px;cursor:pointer;' + (v.wdAsset === c ? 'background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e' : 'color:#9fc4ad'))}>{c}</div>
+              ))}
+            </div>
+
+            <div style={css('display:flex;justify-content:space-between;font-size:13px;color:#92b8a3;margin-bottom:7px')}>
+              <span>Amount</span><span>Available: <b style={css('color:#cfe7da')}>{v.wdBalStr} {v.wdAsset}</b></span>
+            </div>
+            <div style={css('display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:13px;background:rgba(6,22,14,.55);border:1px solid rgba(110,200,150,.2);margin-bottom:14px')}>
+              <input value={v.wdAmt} onChange={v.onWdAmt} inputMode="decimal" placeholder="0.0" style={css("flex:1;background:transparent;border:none;outline:none;color:#eafff4;font-size:23px;font-weight:700;font-family:'Sora',sans-serif;width:100%")} />
+              <span style={css('font-weight:700;color:#cfe7da;font-size:14px')}>{v.wdAsset}</span>
+              <div onClick={v.setMaxWithdraw} style={css('padding:6px 13px;border-radius:12px;background:rgba(35,211,154,.18);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>MAX</div>
+            </div>
+
+            <div style={css('font-size:13px;color:#92b8a3;margin-bottom:7px')}>Your Solana wallet address</div>
+            <input value={v.wdAddr} onChange={v.onWdAddr} placeholder="Paste your SOL address" style={css("width:100%;box-sizing:border-box;padding:13px 14px;border-radius:13px;background:rgba(6,22,14,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:14px;outline:none;font-family:'Sora',sans-serif;margin-bottom:16px")} />
+
+            <div onClick={v.doWithdraw} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:16px;cursor:pointer;' + (v.withdrawing ? 'opacity:.6;pointer-events:none' : ''))}>{v.withdrawing ? 'Sending…' : 'Withdraw ' + v.wdAsset}</div>
+            <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Sent on Solana from the treasury · double-check your address</div>
           </div>
         </div>
       )}
