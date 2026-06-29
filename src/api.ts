@@ -61,11 +61,13 @@ export interface RefRow {
   refs: string
   buy: string
   comm: string
+  bonus: string
 }
 
 export interface ReferralData {
   code: string
   commissionStr: string
+  bonusStr: string
   rows: RefRow[]
 }
 

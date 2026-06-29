@@ -89,6 +89,7 @@ interface MoolaState {
   refCode: string
   refInput: string
   refCommissionStr: string
+  refBonusStr: string
   refRowsData: RefRow[]
   stats: Stats
   stakedAt: number | null
@@ -171,6 +172,7 @@ const initialState: MoolaState = {
   refCode: '',
   refInput: '',
   refCommissionStr: '0.000',
+  refBonusStr: '0.000',
   refRowsData: refRows,
   stats: BASE_STATS,
   stakedAt: null,
@@ -293,7 +295,7 @@ export function useMoola() {
   // Merge server referral data (code, total commission, 10-level breakdown).
   const applyReferral = (r?: ReferralData) => {
     if (!r) return
-    set({ refCode: r.code, refCommissionStr: r.commissionStr, refRowsData: r.rows })
+    set({ refCode: r.code, refCommissionStr: r.commissionStr, refBonusStr: r.bonusStr, refRowsData: r.rows })
   }
 
   // Merge live launch stats (real presale activity + holder count).
@@ -895,6 +897,7 @@ export function useMoola() {
     refLink,
     refCode: s.refCode,
     refCommissionStr: s.refCommissionStr,
+    refBonusStr: s.refBonusStr,
     roadmap,
     faqs,
     refLevels,

@@ -82,21 +82,26 @@ export default function Stake({ v }: { v: MoolaVals }) {
           <span style={css('flex:1;text-align:left;font-size:13px;color:#cfe7da;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{v.refLink}</span>
           <div onClick={v.copyRef} style={css('padding:8px 18px;border-radius:18px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#062018;font-weight:700;font-size:13px;cursor:pointer')}>{v.copyLabel}</div>
         </div>
-        <div style={css('font-size:12px;color:#92b8a3;margin-top:11px')}>Commission: <b style={css('color:#23d39a')}>{v.refCommissionStr}</b> $MOOLA</div>
+        <div style={css('display:flex;justify-content:center;gap:16px;font-size:12px;color:#92b8a3;margin-top:11px')}>
+          <span>Commission: <b style={css('color:#23d39a')}>{v.refCommissionStr}</b></span>
+          <span>Airdrop bonus: <b style={css('color:#f2b34e')}>{v.refBonusStr}</b></span>
+        </div>
       </div>
 
       {/* referral breakdown table */}
       <div style={css('padding:8px 4px 0')}>
-        <div style={css('display:grid;grid-template-columns:1fr 1fr 1.1fr;padding:14px 8px;font-size:14px;color:#cfe7da;font-weight:600')}>
+        <div style={css('display:grid;grid-template-columns:0.8fr 0.9fr 1fr 1fr;padding:14px 6px;font-size:12.5px;color:#cfe7da;font-weight:600')}>
           <div style={css('text-align:left')}>Referrals</div>
-          <div style={css('text-align:center')}>Buy Presale</div>
+          <div style={css('text-align:center')}>Buy</div>
           <div style={css('text-align:right')}>Commission</div>
+          <div style={css('text-align:right')}>Airdrop</div>
         </div>
         {v.refRows.map((r, i) => (
-          <div key={i} style={css('display:grid;grid-template-columns:1fr 1fr 1.1fr;padding:13px 8px;font-size:14.5px;border-top:1px solid rgba(110,200,150,.1);font-variant-numeric:tabular-nums')}>
-            <div style={css('text-align:left;color:#eafff4')}>{r.refs}</div>
+          <div key={i} style={css('display:grid;grid-template-columns:0.8fr 0.9fr 1fr 1fr;padding:13px 6px;font-size:13.5px;border-top:1px solid rgba(110,200,150,.1);font-variant-numeric:tabular-nums')}>
+            <div style={css('text-align:left;color:#eafff4')}>L{i + 1} · {r.refs}</div>
             <div style={css('text-align:center;color:#92b8a3')}>{r.buy}</div>
             <div style={css('text-align:right;color:#23d39a')}>{r.comm}</div>
+            <div style={css('text-align:right;color:#f2b34e')}>{r.bonus}</div>
           </div>
         ))}
       </div>

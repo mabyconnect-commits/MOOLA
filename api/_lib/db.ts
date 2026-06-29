@@ -111,6 +111,9 @@ export function ensureSchema(): Promise<void> {
         )
       `
       await sql`CREATE INDEX IF NOT EXISTS ref_earn_beneficiary_idx ON referral_earnings(beneficiary)`
+      // Airdrop referral bonus earned per downline signup (separate from buy
+      // commission), so the referral breakdown can show it per level.
+      await sql`ALTER TABLE referral_earnings ADD COLUMN IF NOT EXISTS bonus DOUBLE PRECISION NOT NULL DEFAULT 0`
 
       // ---- On-chain deposit columns (idempotent migrations) ----
       // deposit_index: per-user HD index for their unique deposit address.
