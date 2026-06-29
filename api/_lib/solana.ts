@@ -163,37 +163,96 @@ export async function sweepToTreasury(index: number): Promise<string[]> {
   return sigs
 }
 
-/** Pay a user out from the treasury (used by withdrawals). Returns the tx sig. */
+// Error carrying whether the value transfer ever hit the network. `broadcast:
+// false` => provably nothing was paid out (caller may safely refund). `true` =>
+// ambiguous (it may have landed) — caller must NOT refund, to avoid paying a
+// user twice.
+export interface PayoutError extends Error {
+  payout: true
+  broadcast: boolean
+  signature?: string
+}
+function payoutError(message: string, broadcast: boolean, signature?: string): PayoutError {
+  const e = new Error(message) as PayoutError
+  e.payout = true
+  e.broadcast = broadcast
+  e.signature = signature
+  return e
+}
+function isPayoutError(e: unknown): e is PayoutError {
+  return !!e && typeof e === 'object' && (e as PayoutError).payout === true
+}
+
+/**
+ * Pay a user out from the treasury (used by withdrawals). Returns the confirmed
+ * signature, or throws a PayoutError whose `broadcast` flag tells the caller
+ * whether a refund is safe. We deliberately bias toward "do not refund" on any
+ * ambiguity so a user can never be paid twice.
+ */
 export async function payout(to: string, asset: Asset, amount: number): Promise<string> {
   const conn = connection()
-  const treasury = await treasuryKeypair()
-  const dest = new PublicKey(to)
 
-  if (asset === 'SOL') {
-    const tx = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: treasury.publicKey,
-        toPubkey: dest,
-        lamports: Math.round(amount * LAMPORTS),
-      }),
-    )
-    return sendAndConfirmTransaction(conn, tx, [treasury])
+  // ---- Build + sign (nothing on-chain yet; failures here mean nothing paid) ----
+  let tx: Transaction
+  let signers: Keypair[]
+  try {
+    const treasury = await treasuryKeypair()
+    const dest = new PublicKey(to)
+    signers = [treasury]
+    if (asset === 'SOL') {
+      tx = new Transaction().add(
+        SystemProgram.transfer({ fromPubkey: treasury.publicKey, toPubkey: dest, lamports: Math.round(amount * LAMPORTS) }),
+      )
+    } else {
+      const { getAssociatedTokenAddress, getOrCreateAssociatedTokenAccount, createTransferCheckedInstruction } =
+        await import('@solana/spl-token')
+      const mint = mintFor(asset)
+      const fromAta = await getAssociatedTokenAddress(mint, treasury.publicKey)
+      // Creating the destination account moves no user funds, so a failure here
+      // is still "nothing paid out".
+      const toAta = await getOrCreateAssociatedTokenAccount(conn, treasury, mint, dest)
+      tx = new Transaction().add(
+        createTransferCheckedInstruction(fromAta, mint, toAta.address, treasury.publicKey, Math.round(amount * 10 ** TOKEN_DECIMALS), TOKEN_DECIMALS),
+      )
+    }
+    tx.feePayer = signers[0].publicKey
+    tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash
+    tx.sign(...signers)
+  } catch (e) {
+    throw payoutError(e instanceof Error ? e.message : String(e), false)
   }
 
-  const { getAssociatedTokenAddress, getOrCreateAssociatedTokenAccount, createTransferCheckedInstruction } =
-    await import('@solana/spl-token')
-  const mint = mintFor(asset)
-  const fromAta = await getAssociatedTokenAddress(mint, treasury.publicKey)
-  const toAta = await getOrCreateAssociatedTokenAccount(conn, treasury, mint, dest)
-  const tx = new Transaction().add(
-    createTransferCheckedInstruction(
-      fromAta,
-      mint,
-      toAta.address,
-      treasury.publicKey,
-      Math.round(amount * 10 ** TOKEN_DECIMALS),
-      TOKEN_DECIMALS,
-    ),
-  )
-  return sendAndConfirmTransaction(conn, tx, [treasury])
+  // ---- Broadcast ----
+  let signature: string
+  try {
+    signature = await conn.sendRawTransaction(tx.serialize())
+  } catch (e) {
+    // Rejected before entering the network => nothing paid out => safe to refund.
+    throw payoutError('send failed: ' + (e instanceof Error ? e.message : String(e)), false)
+  }
+
+  // ---- Confirm (from here, ambiguity must never trigger a refund) ----
+  try {
+    const latest = await conn.getLatestBlockhash()
+    const conf = await conn.confirmTransaction(
+      { signature, blockhash: latest.blockhash, lastValidBlockHeight: latest.lastValidBlockHeight },
+      'confirmed',
+    )
+    if (conf.value.err) throw payoutError('on-chain failure', false, signature) // failed => no funds moved
+    return signature
+  } catch (e) {
+    if (isPayoutError(e) && e.broadcast === false) throw e // the on-chain-failure above
+    // Confirmation was inconclusive — verify the signature directly.
+    try {
+      const st = (await conn.getSignatureStatus(signature)).value
+      if (st && !st.err && (st.confirmationStatus === 'confirmed' || st.confirmationStatus === 'finalized')) {
+        return signature // it actually landed
+      }
+      if (st && st.err) throw payoutError('on-chain failure', false, signature)
+    } catch (inner) {
+      if (isPayoutError(inner) && inner.broadcast === false) throw inner
+    }
+    // Truly ambiguous => never refund.
+    throw payoutError('unconfirmed', true, signature)
+  }
 }

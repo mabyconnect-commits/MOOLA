@@ -80,6 +80,7 @@ export interface AccountResponse {
   address?: string
   found?: boolean
   sweepNote?: string | null
+  pending?: boolean
   stats?: Stats
 }
 
