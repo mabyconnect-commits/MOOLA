@@ -140,8 +140,12 @@ export function ensureSchema(): Promise<void> {
       `
       await sql`CREATE INDEX IF NOT EXISTS withdrawals_user_idx ON withdrawals(user_id)`
       // Idempotency: a (user, client_key) pair maps to at most one withdrawal.
+      // Must be a FULL unique index (not partial) so `ON CONFLICT (user_id,
+      // client_key)` can match it. NULL client_keys stay distinct (Postgres
+      // treats NULLs as not-equal), so rows without a key never collide.
       await sql`ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS client_key TEXT`
-      await sql`CREATE UNIQUE INDEX IF NOT EXISTS withdrawals_user_key_idx ON withdrawals(user_id, client_key) WHERE client_key IS NOT NULL`
+      await sql`DROP INDEX IF EXISTS withdrawals_user_key_idx`
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS withdrawals_user_key_uq ON withdrawals(user_id, client_key)`
       // Per-user mutex so concurrent deposit-checks can't double-credit.
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_lock TIMESTAMPTZ`
       // Fixed-window rate limiting.
