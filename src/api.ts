@@ -82,6 +82,46 @@ export interface AccountResponse {
   sweepNote?: string | null
   pending?: boolean
   stats?: Stats
+  isAdmin?: boolean
+}
+
+export interface AdminWalletBal {
+  sol: number
+  usdt: number
+  usdc: number
+}
+export interface AdminOverview {
+  users: { total: number; verified: number }
+  totals: { staked: number; available: number; balance: number; sol: number; usdt: number; usdc: number }
+  withdrawals: { status: string; n: number; amount: number }[]
+  wallets: {
+    treasury: { address: string; balances: AdminWalletBal | null }
+    payout: { address: string; balances: AdminWalletBal | null }
+    splitPct: number
+  }
+}
+export interface AdminWithdrawal {
+  id: number
+  user_id: number
+  email: string | null
+  asset: string
+  amount: number
+  address: string
+  status: string
+  signature: string | null
+  created_at: string
+}
+export interface AdminUser {
+  id: number
+  email: string
+  created_at: string
+  deposit_index: number | null
+  balance: number
+  staked: number
+  available: number
+  sol: number
+  usdt: number
+  usdc: number
 }
 
 export interface AuthChallenge {
@@ -138,4 +178,13 @@ export const api = {
   account: () => request<AccountResponse>('/account', 'GET'),
   action: (type: string, body: Record<string, unknown>) =>
     request<AccountResponse>('/action/' + type, 'POST', body),
+  admin: {
+    overview: () => request<AdminOverview>('/admin/overview', 'GET'),
+    withdrawals: (status?: string) =>
+      request<{ withdrawals: AdminWithdrawal[] }>('/admin/withdrawals' + (status ? '?status=' + status : ''), 'GET'),
+    resolve: (id: number) => request<{ resolved: string }>('/admin/resolve-withdrawal', 'POST', { id }),
+    sweepAll: () => request<{ checked: number; swept: number }>('/admin/sweep-all', 'POST', {}),
+    users: (q?: string) =>
+      request<{ users: AdminUser[] }>('/admin/users' + (q ? '?q=' + encodeURIComponent(q) : ''), 'GET'),
+  },
 }

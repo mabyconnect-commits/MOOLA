@@ -111,6 +111,31 @@ export async function readBalances(index: number): Promise<{ sol: number; usdt: 
   return { sol: lamports / LAMPORTS, usdt, usdc }
 }
 
+// On-chain balances for any address (used by the admin dashboard for the
+// treasury / payout wallet cards).
+export async function walletBalances(addr: string): Promise<{ sol: number; usdt: number; usdc: number } | null> {
+  if (!addr) return null
+  try {
+    const conn = connection()
+    const pk = new PublicKey(addr)
+    const lamports = await conn.getBalance(pk)
+    const [usdt, usdc] = await Promise.all([tokenBalance(conn, pk, usdtMint()), tokenBalance(conn, pk, usdcMint())])
+    return { sol: lamports / LAMPORTS, usdt, usdc }
+  } catch {
+    return null
+  }
+}
+
+export function treasuryAddressStr(): string {
+  return TREASURY
+}
+export function payoutAddressStr(): string {
+  return PAYOUT
+}
+export function sweepPayoutPct(): number {
+  return SWEEP_PAYOUT_PCT
+}
+
 /**
  * Sweep everything sitting in a user's deposit address into the treasury.
  *

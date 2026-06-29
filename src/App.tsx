@@ -5,6 +5,7 @@ import Stake from './screens/Stake'
 import Presale from './screens/Presale'
 import Nft from './screens/Nft'
 import Me from './screens/Me'
+import Admin from './screens/Admin'
 import Auth from './Auth'
 import Overlays from './modals/Overlays'
 import BottomNav from './BottomNav'
@@ -28,6 +29,7 @@ export default function App() {
             {v.isPresale && <Presale v={v} />}
             {v.isNft && <Nft v={v} />}
             {v.isMe && <Me v={v} />}
+            {v.isAdminScreen && v.isAdmin && <Admin v={v} />}
 
             <Overlays v={v} />
             <BottomNav v={v} />

@@ -5,6 +5,7 @@ import { sendVerificationEmail } from '../_lib/email.js'
 import { ensureAccount, loadAccount, loadTxns } from '../_lib/economics.js'
 import { buildUpline, genRefCode, loadReferral, resolveReferrer } from '../_lib/referral.js'
 import { clientIp, rateLimit } from '../_lib/ratelimit.js'
+import { isAdminEmail } from '../_lib/admin.js'
 
 interface UserRow {
   id: number
@@ -111,7 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const account = await loadAccount(user.id)
         const txns = await loadTxns(user.id)
         const referral = await loadReferral(user.id)
-        return res.status(200).json({ token, account, txns, referral, email: user.email })
+        return res.status(200).json({ token, account, txns, referral, email: user.email, isAdmin: isAdminEmail(user.email) })
       }
 
       // ---- RESEND ---------------------------------------------------------
@@ -153,7 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const account = await loadAccount(user.id)
         const txns = await loadTxns(user.id)
         const referral = await loadReferral(user.id)
-        return res.status(200).json({ token, account, txns, referral, email: user.email })
+        return res.status(200).json({ token, account, txns, referral, email: user.email, isAdmin: isAdminEmail(user.email) })
       }
 
       default:
