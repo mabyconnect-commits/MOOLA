@@ -18,7 +18,7 @@ export default function Nft({ v }: { v: MoolaVals }) {
         {v.nfts.map((n, i) => (
           <div key={i} style={css('border-radius:16px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);overflow:hidden')}>
             <div style={css('height:150px;position:relative;overflow:hidden')}>
-              <img src={n.img} alt={n.name} style={css('width:100%;height:100%;object-fit:cover;display:block')} />
+              <img src={n.img} alt={n.name} loading="lazy" decoding="async" style={css('width:100%;height:100%;object-fit:cover;display:block')} />
               <div style={css('position:absolute;top:8px;left:8px;padding:3px 9px;border-radius:10px;background:rgba(6,16,11,.7);font-size:10px;font-weight:700;letter-spacing:.3px')}>{n.tier}</div>
             </div>
             <div style={css('padding:11px 12px')}>
