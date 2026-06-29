@@ -13,6 +13,7 @@ import {
   type AdminOverview,
   type AdminWithdrawal,
   type AdminUser,
+  type DepositLookup,
 } from './api'
 
 export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me' | 'admin'
@@ -96,6 +97,8 @@ interface MoolaState {
   adminWithdrawals: AdminWithdrawal[]
   adminUsers: AdminUser[]
   adminBusy: boolean
+  adminDepQuery: string
+  adminDepResult: DepositLookup | null
 }
 
 // Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
@@ -176,6 +179,8 @@ const initialState: MoolaState = {
   adminWithdrawals: [],
   adminUsers: [],
   adminBusy: false,
+  adminDepQuery: '',
+  adminDepResult: null,
 }
 
 function fmt(n: number, d: number): string {
@@ -785,6 +790,46 @@ export function useMoola() {
       flash(errMsg(e))
     }
   }
+  // Deposit investigation: look up a user's on-chain deposit address + balances.
+  const adminDepLookup = async () => {
+    const q = stateRef.current.adminDepQuery.trim()
+    if (!q) return flash('Enter an email or user id')
+    set({ adminBusy: true })
+    try {
+      const r = await api.admin.depositLookup(q)
+      set({ adminDepResult: r })
+    } catch (e) {
+      set({ adminDepResult: null })
+      flash(errMsg(e))
+    } finally {
+      set({ adminBusy: false })
+    }
+  }
+  // Credit any uncredited on-chain funds for the looked-up user, then sweep.
+  const adminDepReconcile = async () => {
+    const r = stateRef.current.adminDepResult
+    if (!r) return
+    if (stateRef.current.adminBusy) return
+    set({ adminBusy: true })
+    try {
+      const res = await api.admin.depositReconcile(r.user.id)
+      if (res.found) {
+        const parts = [
+          res.credited.sol > 0 ? res.credited.sol.toFixed(4) + ' SOL' : '',
+          res.credited.usdt > 0 ? res.credited.usdt.toFixed(2) + ' USDT' : '',
+          res.credited.usdc > 0 ? res.credited.usdc.toFixed(2) + ' USDC' : '',
+        ].filter(Boolean).join(' + ')
+        flash('✅ Credited ' + parts + (res.sweepNote ? ' · sweep: ' + res.sweepNote : ''))
+      } else {
+        flash('Nothing new to credit' + (res.sweepNote ? ' · sweep: ' + res.sweepNote : ''))
+      }
+      await adminDepLookup()
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ adminBusy: false })
+    }
+  }
 
   const v = {
     // screen flags
@@ -800,6 +845,11 @@ export function useMoola() {
     adminWithdrawals: s.adminWithdrawals,
     adminUsers: s.adminUsers,
     adminBusy: s.adminBusy,
+    adminDepQuery: s.adminDepQuery,
+    adminDepResult: s.adminDepResult,
+    onAdminDepQuery: onInput('adminDepQuery'),
+    adminDepLookup,
+    adminDepReconcile,
     openAdmin,
     adminRefresh: adminLoad,
     adminResolve,
