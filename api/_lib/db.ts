@@ -153,6 +153,25 @@ export function ensureSchema(): Promise<void> {
       // Fixed-window rate limiting.
       await sql`CREATE TABLE IF NOT EXISTS rate_limits (k TEXT PRIMARY KEY, win BIGINT NOT NULL, n INT NOT NULL)`
 
+      // ---- Stake lots: each staked chunk has its OWN 20-day clock ----
+      // A lot is created per airdrop claim / referral bonus / manual stake /
+      // compound, with earned_at = when it was earned. Rewards accrue per-lot
+      // until that lot's maturity, after which its principal locks. accounts.
+      // staked / airdrop_locked are kept as fast aggregates of the lots.
+      await sql`
+        CREATE TABLE IF NOT EXISTS stake_lots (
+          id          BIGSERIAL PRIMARY KEY,
+          user_id     BIGINT NOT NULL,
+          amount      DOUBLE PRECISION NOT NULL,
+          source      TEXT NOT NULL DEFAULT 'stake',
+          earned_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+          reward_paid DOUBLE PRECISION NOT NULL DEFAULT 0,
+          locked      BOOLEAN NOT NULL DEFAULT FALSE,
+          locked_at   TIMESTAMPTZ
+        )
+      `
+      await sql`CREATE INDEX IF NOT EXISTS stake_lots_user_active_idx ON stake_lots(user_id) WHERE locked = FALSE`
+
       // ---- One-time pre-launch test-data wipe ----
       // Clears fake balances created by the old simulated deposit/buy. Runs
       // exactly once (tracked in app_meta), automatically on deploy.
@@ -166,6 +185,23 @@ export function ensureSchema(): Promise<void> {
         await sql`DELETE FROM transactions`
         await sql`DELETE FROM referral_earnings`
         await sql`INSERT INTO app_meta (key, val) VALUES ('reset_testdata_v1', 'done')`
+      }
+
+      // ---- One-time stake-lot backfill (runs after the test-data reset) ----
+      // Turns each existing staked balance into a single lot so per-lot accrual
+      // takes over without losing reward already credited. reward_paid is the
+      // reward already produced (capped at maturity) so no balance jumps;
+      // DAILY_RATE=0.0205, STAKE_DAYS window = 20*86400s.
+      const lotsBackfill = await sql<{ key: string }>`SELECT key FROM app_meta WHERE key = 'lots_backfill_v1'`
+      if (!lotsBackfill.rows[0]) {
+        await sql`
+          INSERT INTO stake_lots (user_id, amount, source, earned_at, reward_paid)
+          SELECT user_id, staked, 'legacy',
+                 COALESCE(staked_at, reward_updated_at, now()),
+                 staked * 0.0205
+                   * LEAST(EXTRACT(EPOCH FROM (now() - COALESCE(staked_at, reward_updated_at, now()))), 20 * 86400) / 86400
+          FROM accounts WHERE staked > 0`
+        await sql`INSERT INTO app_meta (key, val) VALUES ('lots_backfill_v1', 'done')`
       }
     })().catch((e) => {
       // Reset so a later request can retry schema creation.

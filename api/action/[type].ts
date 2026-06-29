@@ -12,6 +12,7 @@ import {
   SELL_PRICE,
   WITHDRAW_FEE_PCT,
   SOL_PRICE,
+  addStakeLot,
   STAKE_DAYS,
   DAILY_RATE,
   addTxn,
@@ -86,7 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.airdropClaimed = true
         a.claimAddr = addr
         await saveAccount(userId, a)
-        await sql`UPDATE accounts SET staked_at = now() WHERE user_id = ${userId} AND staked_at IS NULL`
+        // New stake lot with its own 20-day clock.
+        await addStakeLot(userId, AIRDROP_AMOUNT, 'airdrop')
         await addTxn(userId, { icon: '🎁', title: 'Airdrop claimed', sub: `${AIRDROP_AMOUNT} $MOOLA staked`, amt: `+${AIRDROP_AMOUNT} $MOOLA`, pos: true })
         break
       }
@@ -99,7 +101,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.staked += amt
         a.available -= amt
         await saveAccount(userId, a)
-        await sql`UPDATE accounts SET staked_at = now() WHERE user_id = ${userId} AND staked_at IS NULL`
+        // New stake lot with its own 20-day clock.
+        await addStakeLot(userId, amt, 'stake')
         await addTxn(userId, { icon: '🔒', title: 'Staked', sub: `${fmt(amt, 3)} $MOOLA locked`, amt: `-${fmt(amt, 3)} avail`, pos: false })
         break
       }
@@ -124,6 +127,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.balance += r
         a.reward = 0
         await saveAccount(userId, a)
+        // Compounded rewards start their own fresh 20-day clock.
+        await addStakeLot(userId, r, 'compound')
         await addTxn(userId, { icon: '🔁', title: 'Rewards compounded', sub: 'added to stake', amt: `+${fmt(r, 4)} $MOOLA`, pos: true })
         break
       }

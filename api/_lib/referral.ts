@@ -124,16 +124,20 @@ export async function distributeAirdropCommission(newUserId: number): Promise<vo
   // verified yet), so the credit below can't silently miss them.
   await sql`INSERT INTO accounts (user_id) SELECT unnest(${ids}::bigint[]) ON CONFLICT (user_id) DO NOTHING`
 
-  // Auto-stake the bonus: it joins the earner's airdrop principal + stake, and
-  // starts their 20-day lock clock if it isn't already running.
+  // Auto-stake the bonus into each earner's staked aggregate + airdrop total.
   await sql`
     UPDATE accounts SET
       staked = staked + d.amt,
       balance = balance + d.amt,
-      airdrop = airdrop + d.amt,
-      staked_at = COALESCE(staked_at, now())
+      airdrop = airdrop + d.amt
     FROM (SELECT unnest(${ids}::bigint[]) AS user_id, unnest(${amts}::float8[]) AS amt) d
     WHERE accounts.user_id = d.user_id`
+
+  // Each bonus is its own stake lot with its own 20-day clock from now.
+  const sources = ids.map(() => 'airdrop_ref')
+  await sql`
+    INSERT INTO stake_lots (user_id, amount, source)
+    SELECT * FROM unnest(${ids}::bigint[], ${amts}::float8[], ${sources}::text[])`
 
   // Notify each earner in their activity feed.
   const types = ids.map(() => 'Airdrop bonus')
