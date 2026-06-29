@@ -33,6 +33,7 @@ interface MoolaState {
   staked: number
   available: number
   airdrop: number
+  airdropLocked: number
   balance: number
   sol: number
   usdt: number
@@ -112,6 +113,7 @@ const initialState: MoolaState = {
   staked: 0,
   available: 0,
   airdrop: 0,
+  airdropLocked: 0,
   balance: 0,
   sol: 0,
   usdt: 0,
@@ -272,6 +274,7 @@ export function useMoola() {
       available: acc.available,
       reward: acc.reward,
       airdrop: acc.airdrop,
+      airdropLocked: acc.airdropLocked ?? 0,
       sol: acc.sol,
       usdt: acc.usdt,
       usdc: acc.usdc,
@@ -872,6 +875,8 @@ export function useMoola() {
     stakedStr: fmt(s.staked, 3),
     availStr: fmt(s.available, 3),
     airdropBalStr: fmt(s.airdrop, 0),
+    airdropLockedStr: fmt(s.airdropLocked, 3),
+    hasLockedAirdrop: s.airdropLocked > 0,
     usdtStr: fmt(s.balance * 0.01, 2),
     solStr: fmt(s.sol, 4),
     usdtBalStr: fmt(s.usdt, 2),

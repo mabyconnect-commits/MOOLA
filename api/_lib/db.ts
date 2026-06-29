@@ -116,6 +116,8 @@ export function ensureSchema(): Promise<void> {
       // deposit_index: per-user HD index for their unique deposit address.
       // dep_*: cumulative on-chain amount already credited (prevents double-credit).
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deposit_index INTEGER`
+      // Matured airdrop principal, locked permanently till official launch.
+      await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS airdrop_locked DOUBLE PRECISION NOT NULL DEFAULT 0`
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_sol DOUBLE PRECISION NOT NULL DEFAULT 0`
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_usdt DOUBLE PRECISION NOT NULL DEFAULT 0`
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_usdc DOUBLE PRECISION NOT NULL DEFAULT 0`

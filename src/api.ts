@@ -32,6 +32,7 @@ export interface Account {
   available: number
   reward: number
   airdrop: number
+  airdropLocked: number
   sol: number
   usdt: number
   usdc: number

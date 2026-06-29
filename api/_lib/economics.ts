@@ -18,12 +18,19 @@ export const WITHDRAW_FEE_PCT = 5
 export const SOL_PRICE = 152 // illustrative SOL price used for sell quotes
 export const AIRDROP_AMOUNT = 200 // $MOOLA granted on airdrop claim
 
+// Airdrop referral bonus — paid to the upline (auto-staked) when a downline
+// registers successfully. Fixed $MOOLA per level, summing to 2 across 10 levels:
+// 1 + 0.2 + 0.18 + 0.15 + 0.13 + 0.11 + 0.1 + 0.06 + 0.04 + 0.03 = 2.
+export const AIRDROP_REF_AMOUNTS = [1, 0.2, 0.18, 0.15, 0.13, 0.11, 0.1, 0.06, 0.04, 0.03]
+export const AIRDROP_REF_TOTAL = 2
+
 export interface Account {
   balance: number
   staked: number
   available: number
   reward: number
   airdrop: number
+  airdropLocked: number // matured airdrop principal, locked permanently till launch
   sol: number
   usdt: number
   usdc: number
@@ -47,6 +54,7 @@ interface AccountRow {
   available: number
   reward: number
   airdrop: number
+  airdrop_locked: number
   sol: number
   usdt: number
   usdc: number
@@ -74,34 +82,71 @@ export async function loadAccount(userId: number): Promise<Account> {
   if (rows.length === 0) {
     await ensureAccount(userId)
     return {
-      balance: 0, staked: 0, available: 0, reward: 0, airdrop: 0,
+      balance: 0, staked: 0, available: 0, reward: 0, airdrop: 0, airdropLocked: 0,
       sol: 0, usdt: 0, usdc: 0, minted: 0, airdropClaimed: false, claimAddr: null,
       stakedAt: null,
     }
   }
   const r = rows[0]
   const last = new Date(r.reward_updated_at).getTime()
-  const elapsedSec = Math.max(0, (Date.now() - last) / 1000)
-  const accrued = (r.staked * DAILY_RATE * elapsedSec) / 86400
-  const reward = r.reward + accrued
+  const lockStart = r.staked_at ? new Date(r.staked_at).getTime() : null
+  const now = Date.now()
 
-  if (accrued > 0) {
-    await sql`UPDATE accounts SET reward = ${reward}, reward_updated_at = now() WHERE user_id = ${userId}`
+  let staked = r.staked
+  let airdropLocked = Number(r.airdrop_locked || 0)
+  let reward = r.reward
+  let stakedAt = lockStart
+  let changed = false
+
+  if (staked > 0 && lockStart) {
+    // Rewards accrue only within the STAKE_DAYS window — capped at maturity.
+    const matureAt = lockStart + STAKE_DAYS * 86400 * 1000
+    const effEnd = Math.min(now, matureAt)
+    const accrued = (staked * DAILY_RATE * Math.max(0, (effEnd - last) / 1000)) / 86400
+    if (accrued > 0) {
+      reward += accrued
+      changed = true
+    }
+    if (now >= matureAt) {
+      // Stake matured: move the principal into the locked airdrop wallet
+      // (permanent till official launch) and stop earning. Clearing staked_at
+      // lets any future airdrop bonus start a fresh 20-day clock.
+      airdropLocked += staked
+      staked = 0
+      stakedAt = null
+      changed = true
+    }
+  } else if (staked > 0 && !lockStart) {
+    // A stake with no lock-start (e.g. compounded after maturity) — start now.
+    stakedAt = now
+    changed = true
+  }
+
+  if (changed) {
+    await sql`
+      UPDATE accounts SET
+        reward = ${reward},
+        staked = ${staked},
+        airdrop_locked = ${airdropLocked},
+        staked_at = ${stakedAt ? new Date(stakedAt).toISOString() : null},
+        reward_updated_at = now()
+      WHERE user_id = ${userId}`
   }
 
   return {
     balance: r.balance,
-    staked: r.staked,
+    staked,
     available: r.available,
     reward,
     airdrop: r.airdrop,
+    airdropLocked,
     sol: r.sol,
     usdt: r.usdt,
     usdc: r.usdc,
     minted: r.minted,
     airdropClaimed: r.airdrop_claimed,
     claimAddr: r.claim_addr,
-    stakedAt: r.staked_at ? new Date(r.staked_at).getTime() : null,
+    stakedAt,
   }
 }
 
@@ -115,6 +160,7 @@ export async function saveAccount(userId: number, a: Account): Promise<void> {
       available = ${a.available},
       reward = ${a.reward},
       airdrop = ${a.airdrop},
+      airdrop_locked = ${a.airdropLocked},
       sol = ${a.sol},
       usdt = ${a.usdt},
       usdc = ${a.usdc},

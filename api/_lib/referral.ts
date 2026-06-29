@@ -1,5 +1,5 @@
 import { sql } from './db.js'
-import { fmt } from './economics.js'
+import { fmt, AIRDROP_REF_AMOUNTS } from './economics.js'
 
 // 10-level commission rates (mirrors the frontend refLevels: 3.5% … 0.1%).
 // Commission is paid in $MOOLA as a percentage of the tokens a downline buys.
@@ -100,6 +100,53 @@ export async function loadReferral(userId: number): Promise<ReferralData> {
     rows.push({ refs: String(refsByLvl.get(lvl) || 0), buy: fmt(e.buy, 0), comm: fmt(e.comm, 3) })
   }
   return { code, commissionStr: fmt(totalComm, 3), rows }
+}
+
+// Pay the airdrop referral bonus up a NEW user's upline when they register
+// successfully. Each level earns a fixed $MOOLA amount (AIRDROP_REF_AMOUNTS),
+// auto-staked into the earner's airdrop stake. Fires once per new user.
+export async function distributeAirdropCommission(newUserId: number): Promise<void> {
+  const u = await sql<{ upline: (number | string)[] | null }>`SELECT upline FROM users WHERE id = ${newUserId}`
+  const upline = (u.rows[0]?.upline || []).map(Number)
+  if (!upline.length) return
+
+  const ids: number[] = []
+  const amts: number[] = []
+  const levels: number[] = []
+  for (let i = 0; i < upline.length && i < AIRDROP_REF_AMOUNTS.length; i++) {
+    ids.push(upline[i])
+    amts.push(AIRDROP_REF_AMOUNTS[i])
+    levels.push(i + 1)
+  }
+  if (!ids.length) return
+
+  // Make sure every upline earner has an accounts row (a referrer may not have
+  // verified yet), so the credit below can't silently miss them.
+  await sql`INSERT INTO accounts (user_id) SELECT unnest(${ids}::bigint[]) ON CONFLICT (user_id) DO NOTHING`
+
+  // Auto-stake the bonus: it joins the earner's airdrop principal + stake, and
+  // starts their 20-day lock clock if it isn't already running.
+  await sql`
+    UPDATE accounts SET
+      staked = staked + d.amt,
+      balance = balance + d.amt,
+      airdrop = airdrop + d.amt,
+      staked_at = COALESCE(staked_at, now())
+    FROM (SELECT unnest(${ids}::bigint[]) AS user_id, unnest(${amts}::float8[]) AS amt) d
+    WHERE accounts.user_id = d.user_id`
+
+  // Notify each earner in their activity feed.
+  const types = ids.map(() => 'Airdrop bonus')
+  const icons = ids.map(() => '🎁')
+  const titles = ids.map(() => 'Airdrop bonus')
+  const subs = levels.map((l) => `Level ${l} · referral signup · auto-staked`)
+  const amtStrs = amts.map((a) => `+${fmt(a, 3)} $MOOLA`)
+  const poss = ids.map(() => true)
+  await sql`
+    INSERT INTO transactions (user_id, type, icon, title, sub, amt, pos)
+    SELECT * FROM unnest(
+      ${ids}::bigint[], ${types}::text[], ${icons}::text[], ${titles}::text[],
+      ${subs}::text[], ${amtStrs}::text[], ${poss}::boolean[])`
 }
 
 // Pay commission up the buyer's stored upline in two batched statements.
