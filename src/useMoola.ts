@@ -48,6 +48,7 @@ interface MoolaState {
   wdAsset: 'SOL' | 'USDT' | 'USDC'
   wdAmt: string
   wdAddr: string
+  wdKey: string
   withdrawing: boolean
   minted: number
   history: boolean
@@ -121,6 +122,7 @@ const initialState: MoolaState = {
   wdAsset: 'SOL',
   wdAmt: '',
   wdAddr: '',
+  wdKey: '',
   withdrawing: false,
   minted: 0,
   history: false,
@@ -629,7 +631,7 @@ export function useMoola() {
     if (amt > bal) return flash('Insufficient ' + cur.wdAsset + ' balance')
     set({ withdrawing: true })
     try {
-      const r = await api.action('withdraw', { asset: cur.wdAsset, amount: amt, address: addr })
+      const r = await api.action('withdraw', { asset: cur.wdAsset, amount: amt, address: addr, key: cur.wdKey })
       if (r.account) applyAccount(r.account, r.txns)
       set({ withdraw: false, wdAmt: '', wdAddr: '' })
       flash(r.pending ? '⏳ Withdrawal processing — it should arrive shortly' : '✅ Withdrawal sent to your wallet')
@@ -899,7 +901,17 @@ export function useMoola() {
     wdAddr: s.wdAddr,
     withdrawing: s.withdrawing,
     wdBalStr: fmt(s.wdAsset === 'SOL' ? s.sol : s.wdAsset === 'USDT' ? s.usdt : s.usdc, s.wdAsset === 'SOL' ? 4 : 2),
-    openWithdraw: () => set({ withdraw: true, wallet: false }),
+    openWithdraw: () =>
+      set({
+        withdraw: true,
+        wallet: false,
+        // Fresh idempotency key per withdraw attempt — a retry of the same
+        // sheet reuses it, so a lost response can't cause a double payout.
+        wdKey:
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : String(Date.now()) + '-' + Math.random().toString(36).slice(2),
+      }),
     closeWithdraw: () => set({ withdraw: false }),
     setWdAsset: (a: 'SOL' | 'USDT' | 'USDC') => set({ wdAsset: a, wdAmt: '' }),
     onWdAmt: onInput('wdAmt'),

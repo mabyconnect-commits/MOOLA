@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ensureSchema, getDepositIndex, getDepCredited, sql } from '../_lib/db.js'
 import { SOLANA_ADDR_RE, userIdFromReq } from '../_lib/auth.js'
 import { distributeCommission } from '../_lib/referral.js'
+import { rateLimit } from '../_lib/ratelimit.js'
 // NOTE: the Solana module (heavy deps + env-derived keys) is imported lazily
 // inside the deposit cases only, so a misconfig there can never crash the whole
 // action function (which would 500 every action — claim, stake, buy, …).
@@ -23,6 +24,30 @@ import {
 type Ccy = 'USDT' | 'USDC'
 type Asset = 'SOL' | 'USDT' | 'USDC'
 
+// Resolve any of a user's withdrawals left in 'pending' (an ambiguous payout)
+// by checking the signature on-chain: confirmed → mark sent; failed → refund.
+// 'unknown' is left pending for manual review. Self-heals at withdraw time.
+async function reconcilePending(
+  userId: number,
+  solana: typeof import('../_lib/solana.js'),
+): Promise<void> {
+  const { rows } = await sql<{ id: number; asset: string; amount: number; signature: string | null }>`
+    SELECT id, asset, amount, signature FROM withdrawals WHERE user_id = ${userId} AND status = 'pending'`
+  for (const w of rows) {
+    if (!w.signature) continue
+    const landed = await solana.signatureLanded(w.signature)
+    if (landed === 'confirmed') {
+      await sql`UPDATE withdrawals SET status = 'sent' WHERE id = ${w.id}`
+    } else if (landed === 'failed') {
+      const amt = Number(w.amount)
+      if (w.asset === 'SOL') await sql`UPDATE accounts SET sol = sol + ${amt} WHERE user_id = ${userId}`
+      else if (w.asset === 'USDT') await sql`UPDATE accounts SET usdt = usdt + ${amt} WHERE user_id = ${userId}`
+      else await sql`UPDATE accounts SET usdc = usdc + ${amt} WHERE user_id = ${userId}`
+      await sql`UPDATE withdrawals SET status = 'reversed' WHERE id = ${w.id}`
+    }
+  }
+}
+
 // All balance-changing actions live here so we stay well under Vercel's
 // function count. Each one mirrors the frontend logic, but the server is now
 // the source of truth and every change is persisted + recorded in history.
@@ -34,6 +59,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const type = req.query.type as string
   const body = (req.body || {}) as Record<string, unknown>
+
+  // Rate limit: generous per-user cap to stop abuse/runaway loops without
+  // hampering normal use. Money-moving actions get a tighter cap.
+  const tight = type === 'withdraw' || type === 'buy' || type === 'sell'
+  const allowed = await rateLimit(`act:${userId}:${tight ? type : 'all'}`, tight ? 12 : 60, 60_000)
+  if (!allowed) return res.status(429).json({ error: 'Too many requests — please slow down.' })
 
   try {
     await ensureSchema()
@@ -165,6 +196,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const solana = await import('../_lib/solana.js')
         const { depositConfigured, readBalances, payoutConfigured, sweepToTreasury } = solana
         if (!depositConfigured()) return res.status(503).json({ error: 'Deposit system not configured' })
+
+        // Per-user mutex: only one deposit-check runs at a time, so two
+        // concurrent checks can't read the same on-chain balance and both
+        // credit it (double-credit). Stale locks (>30s) are reclaimable.
+        const lock = await sql`
+          UPDATE accounts SET dep_lock = now()
+          WHERE user_id = ${userId} AND (dep_lock IS NULL OR dep_lock < now() - interval '30 seconds')
+          RETURNING user_id`
+        if (!lock.rows.length) {
+          const account = await loadAccount(userId)
+          const txns = await loadTxns(userId)
+          return res.status(200).json({ account, txns, found: false })
+        }
+
         const index = await getDepositIndex(userId)
         const onchain = await readBalances(index)
         const seen = await getDepCredited(userId)
@@ -216,7 +261,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           }
         }
-        await sql`UPDATE accounts SET dep_sol = ${depSol}, dep_usdt = ${depUsdt}, dep_usdc = ${depUsdc} WHERE user_id = ${userId}`
+        await sql`UPDATE accounts SET dep_sol = ${depSol}, dep_usdt = ${depUsdt}, dep_usdc = ${depUsdc}, dep_lock = NULL WHERE user_id = ${userId}`
 
         const account = await loadAccount(userId)
         const txns = await loadTxns(userId)
@@ -256,9 +301,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!solana.payoutConfigured()) {
           return res.status(503).json({ error: 'Withdrawals are not available yet.' })
         }
+        // First, settle any earlier ambiguous withdrawals (self-healing).
+        await reconcilePending(userId, solana)
+
         const wasset: Asset = body.asset === 'USDC' ? 'USDC' : body.asset === 'USDT' ? 'USDT' : 'SOL'
         const wamt = Number(body.amount)
         const waddr = String(body.address || '').trim()
+        const clientKey = String(body.key || '').slice(0, 80) || null
         if (!wamt || wamt <= 0) return res.status(400).json({ error: 'Enter an amount to withdraw' })
         if (!SOLANA_ADDR_RE.test(waddr)) return res.status(400).json({ error: 'Enter a valid Solana address' })
         // SOL min sits just above Solana's rent-exempt floor (~0.00089) so a
@@ -267,6 +316,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (wamt < MIN[wasset]) {
           return res.status(400).json({ error: `Minimum withdrawal is ${MIN[wasset]} ${wasset}` })
         }
+
+        // Idempotency: claim the request by (user, client_key). A duplicate
+        // (e.g. a retry after a lost response) hits the unique index and is a
+        // no-op rather than a second payout.
+        const claim = await sql<{ id: number }>`
+          INSERT INTO withdrawals (user_id, asset, amount, address, status, client_key)
+          VALUES (${userId}, ${wasset}, ${wamt}, ${waddr}, 'new', ${clientKey})
+          ON CONFLICT (user_id, client_key) DO NOTHING RETURNING id`
+        if (clientKey && !claim.rows.length) {
+          const account = await loadAccount(userId)
+          const txns = await loadTxns(userId)
+          return res.status(200).json({ account, txns, pending: true, error: 'This withdrawal was already submitted.' })
+        }
+        const withdrawalId = claim.rows[0]?.id
 
         // Atomically reserve the funds: the deduction only succeeds if the
         // balance covers it, so concurrent requests can't overdraw the wallet.
@@ -281,12 +344,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const r = await sql`UPDATE accounts SET usdc = usdc - ${wamt} WHERE user_id = ${userId} AND usdc >= ${wamt} RETURNING user_id`
           reserved = r.rows.length > 0
         }
-        if (!reserved) return res.status(400).json({ error: `Insufficient ${wasset} balance` })
+        if (!reserved) {
+          await sql`UPDATE withdrawals SET status = 'failed' WHERE id = ${withdrawalId}`
+          return res.status(400).json({ error: `Insufficient ${wasset} balance` })
+        }
 
-        const wid = await sql<{ id: number }>`
-          INSERT INTO withdrawals (user_id, asset, amount, address, status)
-          VALUES (${userId}, ${wasset}, ${wamt}, ${waddr}, 'pending') RETURNING id`
-        const withdrawalId = wid.rows[0]?.id
+        await sql`UPDATE withdrawals SET status = 'pending' WHERE id = ${withdrawalId}`
 
         let sig: string
         try {

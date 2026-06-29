@@ -183,6 +183,23 @@ function isPayoutError(e: unknown): e is PayoutError {
   return !!e && typeof e === 'object' && (e as PayoutError).payout === true
 }
 
+// Reconciliation: did a previously-broadcast signature actually land?
+//   'confirmed' — succeeded on-chain
+//   'failed'    — landed but errored (no funds moved)
+//   'unknown'   — not found / inconclusive (leave the withdrawal pending)
+export async function signatureLanded(sig: string): Promise<'confirmed' | 'failed' | 'unknown'> {
+  try {
+    const conn = connection()
+    const st = (await conn.getSignatureStatus(sig, { searchTransactionHistory: true })).value
+    if (!st) return 'unknown'
+    if (st.err) return 'failed'
+    if (st.confirmationStatus === 'confirmed' || st.confirmationStatus === 'finalized') return 'confirmed'
+    return 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
 /**
  * Pay a user out from the treasury (used by withdrawals). Returns the confirmed
  * signature, or throws a PayoutError whose `broadcast` flag tells the caller
