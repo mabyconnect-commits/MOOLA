@@ -139,6 +139,13 @@ export function ensureSchema(): Promise<void> {
         )
       `
       await sql`CREATE INDEX IF NOT EXISTS withdrawals_user_idx ON withdrawals(user_id)`
+      // Idempotency: a (user, client_key) pair maps to at most one withdrawal.
+      await sql`ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS client_key TEXT`
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS withdrawals_user_key_idx ON withdrawals(user_id, client_key) WHERE client_key IS NOT NULL`
+      // Per-user mutex so concurrent deposit-checks can't double-credit.
+      await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_lock TIMESTAMPTZ`
+      // Fixed-window rate limiting.
+      await sql`CREATE TABLE IF NOT EXISTS rate_limits (k TEXT PRIMARY KEY, win BIGINT NOT NULL, n INT NOT NULL)`
 
       // ---- One-time pre-launch test-data wipe ----
       // Clears fake balances created by the old simulated deposit/buy. Runs

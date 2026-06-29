@@ -4,6 +4,7 @@ import { EMAIL_RE, hashPassword, signToken, verifyPassword } from '../_lib/auth.
 import { sendVerificationEmail } from '../_lib/email.js'
 import { ensureAccount, loadAccount, loadTxns } from '../_lib/economics.js'
 import { buildUpline, genRefCode, loadReferral, resolveReferrer } from '../_lib/referral.js'
+import { clientIp, rateLimit } from '../_lib/ratelimit.js'
 
 interface UserRow {
   id: number
@@ -28,6 +29,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (e) {
     console.error('[moola] schema init failed:', e)
     return res.status(500).json({ error: 'Service is temporarily unavailable. Please try again.' })
+  }
+
+  // Rate limit auth by client IP to blunt brute-force / abuse.
+  const ip = clientIp(req.headers)
+  if (!(await rateLimit(`auth:${ip}`, 30, 60_000))) {
+    return res.status(429).json({ error: 'Too many attempts — please wait a minute and try again.' })
   }
 
   const action = req.query.action as string
