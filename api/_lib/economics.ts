@@ -6,9 +6,23 @@ import { sql } from './db.js'
 // ---------------------------------------------------------------------------
 export const DAILY_RATE = 0.0205 // 2.05% per day
 export const STAKE_DAYS = 20
-export const PRESALE_PRICE = 0.01 // $0.01 per $MOOLA
+export const PRESALE_PRICE = 0.01 // $0.01 per $MOOLA — the buy rate
+// Sell rate is $0.0095 per $MOOLA: a 5% platform spread below the buy rate.
+// (0.0095 / 0.01 = 0.95, so the platform keeps 5% on every sell.)
+export const SELL_PRICE = 0.0095
+export const SELL_FEE_PCT = 5 // platform take on each sell (the buy↔sell spread)
+// Withdrawal fee: the full requested amount leaves the user's balance, but only
+// (100 - WITHDRAW_FEE_PCT)% is paid on-chain to their wallet. The rest is the
+// platform's fee (kept in the payout wallet).
+export const WITHDRAW_FEE_PCT = 5
 export const SOL_PRICE = 152 // illustrative SOL price used for sell quotes
 export const AIRDROP_AMOUNT = 200 // $MOOLA granted on airdrop claim
+
+// Airdrop referral bonus — paid to the upline (auto-staked) when a downline
+// registers successfully. Fixed $MOOLA per level, summing to 2 across 10 levels:
+// 1 + 0.2 + 0.18 + 0.15 + 0.13 + 0.11 + 0.1 + 0.06 + 0.04 + 0.03 = 2.
+export const AIRDROP_REF_AMOUNTS = [1, 0.2, 0.18, 0.15, 0.13, 0.11, 0.1, 0.06, 0.04, 0.03]
+export const AIRDROP_REF_TOTAL = 2
 
 export interface Account {
   balance: number
@@ -16,6 +30,7 @@ export interface Account {
   available: number
   reward: number
   airdrop: number
+  airdropLocked: number // matured airdrop principal, locked permanently till launch
   sol: number
   usdt: number
   usdc: number
@@ -39,6 +54,7 @@ interface AccountRow {
   available: number
   reward: number
   airdrop: number
+  airdrop_locked: number
   sol: number
   usdt: number
   usdc: number
@@ -58,42 +74,97 @@ export async function ensureAccount(userId: number): Promise<void> {
   await sql`INSERT INTO accounts (user_id) VALUES (${userId}) ON CONFLICT (user_id) DO NOTHING`
 }
 
-// Loads the account, lazily accruing staking rewards for the time elapsed since
-// the last touch, and persisting the new reward + timestamp. This makes reward
-// growth real and server-authoritative rather than a client-only animation.
+// Records a new stake "lot" — a chunk of staked $MOOLA with its OWN 20-day
+// clock starting now. Each airdrop, bonus, manual stake or compound is its own
+// lot, so they mature (and lock) independently based on when each was earned.
+// Callers must also move the principal into accounts.staked (kept as a fast
+// denormalised aggregate); the lot is the source of truth for the clock.
+export async function addStakeLot(userId: number, amount: number, source: string): Promise<void> {
+  if (amount <= 0) return
+  await sql`INSERT INTO stake_lots (user_id, amount, source) VALUES (${userId}, ${amount}, ${source})`
+}
+
+// Loads the account, accruing staking rewards per-lot (each lot earns
+// DAILY_RATE/day for STAKE_DAYS from its own earned_at). When a lot passes its
+// 20-day mark its principal is moved out of `staked` into `airdrop_locked`
+// (locked permanently till launch) and it stops earning. Rewards accumulate
+// into the claimable `reward` balance, which the user can claim → withdraw.
 export async function loadAccount(userId: number): Promise<Account> {
   const { rows } = await sql<AccountRow>`SELECT * FROM accounts WHERE user_id = ${userId}`
   if (rows.length === 0) {
     await ensureAccount(userId)
     return {
-      balance: 0, staked: 0, available: 0, reward: 0, airdrop: 0,
+      balance: 0, staked: 0, available: 0, reward: 0, airdrop: 0, airdropLocked: 0,
       sol: 0, usdt: 0, usdc: 0, minted: 0, airdropClaimed: false, claimAddr: null,
       stakedAt: null,
     }
   }
   const r = rows[0]
-  const last = new Date(r.reward_updated_at).getTime()
-  const elapsedSec = Math.max(0, (Date.now() - last) / 1000)
-  const accrued = (r.staked * DAILY_RATE * elapsedSec) / 86400
-  const reward = r.reward + accrued
+  const now = Date.now()
 
-  if (accrued > 0) {
-    await sql`UPDATE accounts SET reward = ${reward}, reward_updated_at = now() WHERE user_id = ${userId}`
+  // Walk the still-earning lots, accruing reward up to each lot's own maturity.
+  const lots = await sql<{ id: number; amount: number; earned_at: string; reward_paid: number }>`
+    SELECT id, amount, earned_at, reward_paid FROM stake_lots
+    WHERE user_id = ${userId} AND locked = FALSE`
+
+  let rewardDelta = 0
+  let lockedDelta = 0
+  let earliest: number | null = null
+  const accrueIds: number[] = []
+  const accruePaid: number[] = []
+  const matureIds: number[] = []
+  for (const lot of lots.rows) {
+    const start = new Date(lot.earned_at).getTime()
+    if (earliest === null || start < earliest) earliest = start
+    const matureAt = start + STAKE_DAYS * 86400 * 1000
+    const effEnd = Math.min(now, matureAt)
+    const totalDue = (Number(lot.amount) * DAILY_RATE * Math.max(0, (effEnd - start) / 1000)) / 86400
+    const newReward = totalDue - Number(lot.reward_paid)
+    if (newReward > 1e-12) {
+      rewardDelta += newReward
+      accrueIds.push(lot.id)
+      accruePaid.push(totalDue)
+    }
+    if (now >= matureAt) {
+      matureIds.push(lot.id)
+      lockedDelta += Number(lot.amount)
+    }
+  }
+
+  const reward = r.reward + rewardDelta
+  let staked = r.staked - lockedDelta
+  if (staked < 0) staked = 0
+  const airdropLocked = Number(r.airdrop_locked || 0) + lockedDelta
+
+  if (accrueIds.length) {
+    await sql`
+      UPDATE stake_lots SET reward_paid = d.rp
+      FROM (SELECT unnest(${accrueIds}::bigint[]) AS id, unnest(${accruePaid}::float8[]) AS rp) d
+      WHERE stake_lots.id = d.id`
+  }
+  if (matureIds.length) {
+    await sql`UPDATE stake_lots SET locked = TRUE, locked_at = now() WHERE id = ANY(${matureIds}::bigint[])`
+  }
+  if (rewardDelta !== 0 || lockedDelta !== 0) {
+    await sql`
+      UPDATE accounts SET reward = ${reward}, staked = ${staked}, airdrop_locked = ${airdropLocked}, reward_updated_at = now()
+      WHERE user_id = ${userId}`
   }
 
   return {
     balance: r.balance,
-    staked: r.staked,
+    staked,
     available: r.available,
     reward,
     airdrop: r.airdrop,
+    airdropLocked,
     sol: r.sol,
     usdt: r.usdt,
     usdc: r.usdc,
     minted: r.minted,
     airdropClaimed: r.airdrop_claimed,
     claimAddr: r.claim_addr,
-    stakedAt: r.staked_at ? new Date(r.staked_at).getTime() : null,
+    stakedAt: earliest,
   }
 }
 
@@ -107,6 +178,7 @@ export async function saveAccount(userId: number, a: Account): Promise<void> {
       available = ${a.available},
       reward = ${a.reward},
       airdrop = ${a.airdrop},
+      airdrop_locked = ${a.airdropLocked},
       sol = ${a.sol},
       usdt = ${a.usdt},
       usdc = ${a.usdc},

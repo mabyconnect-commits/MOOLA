@@ -8,6 +8,7 @@ export interface RefRow {
   refs: string
   buy: string
   comm: string
+  bonus: string
 }
 export interface Nft {
   name: string
@@ -56,6 +57,7 @@ export const refRows: RefRow[] = Array.from({ length: 10 }, () => ({
   refs: '0',
   buy: '0',
   comm: '0',
+  bonus: '0',
 }))
 
 export const nfts: Nft[] = [

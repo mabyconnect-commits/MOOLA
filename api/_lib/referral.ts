@@ -1,5 +1,5 @@
 import { sql } from './db.js'
-import { fmt } from './economics.js'
+import { fmt, AIRDROP_REF_AMOUNTS } from './economics.js'
 
 // 10-level commission rates (mirrors the frontend refLevels: 3.5% … 0.1%).
 // Commission is paid in $MOOLA as a percentage of the tokens a downline buys.
@@ -54,10 +54,12 @@ export interface RefRowData {
   refs: string
   buy: string
   comm: string
+  bonus: string
 }
 export interface ReferralData {
   code: string
   commissionStr: string
+  bonusStr: string
   rows: RefRowData[]
 }
 
@@ -75,8 +77,9 @@ export async function loadReferral(userId: number): Promise<ReferralData> {
     WHERE ${userId}::bigint = ANY(upline)
     GROUP BY 1`
 
-  const earn = await sql<{ level: number | string; comm: number | string; buy: number | string }>`
-    SELECT level, COALESCE(sum(commission), 0) AS comm, COALESCE(sum(buy_tokens), 0) AS buy
+  const earn = await sql<{ level: number | string; comm: number | string; buy: number | string; bonus: number | string }>`
+    SELECT level, COALESCE(sum(commission), 0) AS comm, COALESCE(sum(buy_tokens), 0) AS buy,
+           COALESCE(sum(bonus), 0) AS bonus
     FROM referral_earnings
     WHERE beneficiary = ${userId}
     GROUP BY level`
@@ -86,20 +89,83 @@ export async function loadReferral(userId: number): Promise<ReferralData> {
     const l = Number(r.lvl)
     if (l >= 1 && l <= 10) refsByLvl.set(l, Number(r.n))
   }
-  const earnByLvl = new Map<number, { comm: number; buy: number }>()
+  const earnByLvl = new Map<number, { comm: number; buy: number; bonus: number }>()
   let totalComm = 0
+  let totalBonus = 0
   for (const r of earn.rows) {
     const l = Number(r.level)
-    earnByLvl.set(l, { comm: Number(r.comm), buy: Number(r.buy) })
+    earnByLvl.set(l, { comm: Number(r.comm), buy: Number(r.buy), bonus: Number(r.bonus) })
     totalComm += Number(r.comm)
+    totalBonus += Number(r.bonus)
   }
 
   const rows: RefRowData[] = []
   for (let lvl = 1; lvl <= 10; lvl++) {
-    const e = earnByLvl.get(lvl) || { comm: 0, buy: 0 }
-    rows.push({ refs: String(refsByLvl.get(lvl) || 0), buy: fmt(e.buy, 0), comm: fmt(e.comm, 3) })
+    const e = earnByLvl.get(lvl) || { comm: 0, buy: 0, bonus: 0 }
+    rows.push({ refs: String(refsByLvl.get(lvl) || 0), buy: fmt(e.buy, 0), comm: fmt(e.comm, 3), bonus: fmt(e.bonus, 3) })
   }
-  return { code, commissionStr: fmt(totalComm, 3), rows }
+  return { code, commissionStr: fmt(totalComm, 3), bonusStr: fmt(totalBonus, 3), rows }
+}
+
+// Pay the airdrop referral bonus up a NEW user's upline when they register
+// successfully. Each level earns a fixed $MOOLA amount (AIRDROP_REF_AMOUNTS),
+// auto-staked into the earner's airdrop stake. Fires once per new user.
+export async function distributeAirdropCommission(newUserId: number): Promise<void> {
+  const u = await sql<{ upline: (number | string)[] | null }>`SELECT upline FROM users WHERE id = ${newUserId}`
+  const upline = (u.rows[0]?.upline || []).map(Number)
+  if (!upline.length) return
+
+  const ids: number[] = []
+  const amts: number[] = []
+  const levels: number[] = []
+  for (let i = 0; i < upline.length && i < AIRDROP_REF_AMOUNTS.length; i++) {
+    ids.push(upline[i])
+    amts.push(AIRDROP_REF_AMOUNTS[i])
+    levels.push(i + 1)
+  }
+  if (!ids.length) return
+
+  // Make sure every upline earner has an accounts row (a referrer may not have
+  // verified yet), so the credit below can't silently miss them.
+  await sql`INSERT INTO accounts (user_id) SELECT unnest(${ids}::bigint[]) ON CONFLICT (user_id) DO NOTHING`
+
+  // Auto-stake the bonus into each earner's staked aggregate + airdrop total.
+  await sql`
+    UPDATE accounts SET
+      staked = staked + d.amt,
+      balance = balance + d.amt,
+      airdrop = airdrop + d.amt
+    FROM (SELECT unnest(${ids}::bigint[]) AS user_id, unnest(${amts}::float8[]) AS amt) d
+    WHERE accounts.user_id = d.user_id`
+
+  // Each bonus is its own stake lot with its own 20-day clock from now.
+  const sources = ids.map(() => 'airdrop_ref')
+  await sql`
+    INSERT INTO stake_lots (user_id, amount, source)
+    SELECT * FROM unnest(${ids}::bigint[], ${amts}::float8[], ${sources}::text[])`
+
+  // Record on the referral ledger (as `bonus`, separate from buy commission)
+  // so it shows per-level on each earner's referral breakdown list.
+  const fromUsers = ids.map(() => newUserId)
+  const zeros = ids.map(() => 0)
+  await sql`
+    INSERT INTO referral_earnings (beneficiary, from_user, level, buy_tokens, commission, bonus)
+    SELECT * FROM unnest(
+      ${ids}::bigint[], ${fromUsers}::bigint[], ${levels}::int[],
+      ${zeros}::float8[], ${zeros}::float8[], ${amts}::float8[])`
+
+  // Notify each earner in their activity feed.
+  const types = ids.map(() => 'Airdrop bonus')
+  const icons = ids.map(() => '🎁')
+  const titles = ids.map(() => 'Airdrop bonus')
+  const subs = levels.map((l) => `Level ${l} · referral signup · auto-staked`)
+  const amtStrs = amts.map((a) => `+${fmt(a, 3)} $MOOLA`)
+  const poss = ids.map(() => true)
+  await sql`
+    INSERT INTO transactions (user_id, type, icon, title, sub, amt, pos)
+    SELECT * FROM unnest(
+      ${ids}::bigint[], ${types}::text[], ${icons}::text[], ${titles}::text[],
+      ${subs}::text[], ${amtStrs}::text[], ${poss}::boolean[])`
 }
 
 // Pay commission up the buyer's stored upline in two batched statements.
@@ -134,4 +200,18 @@ export async function distributeCommission(buyerId: number, tokens: number): Pro
   await sql`
     INSERT INTO referral_earnings (beneficiary, from_user, level, buy_tokens, commission)
     SELECT * FROM unnest(${ids}::bigint[], ${fromUsers}::bigint[], ${levels}::int[], ${buyTokens}::float8[], ${amts}::float8[])`
+
+  // Drop a notification into each beneficiary's activity feed so referral
+  // commission is visible there, not just in the referral breakdown.
+  const types = ids.map(() => 'Referral commission')
+  const icons = ids.map(() => '🤝')
+  const titles = ids.map(() => 'Referral commission')
+  const subs = levels.map((l) => `Level ${l} · from a referral's buy`)
+  const amtStrs = amts.map((a) => `+${fmt(a, 3)} $MOOLA`)
+  const poss = ids.map(() => true)
+  await sql`
+    INSERT INTO transactions (user_id, type, icon, title, sub, amt, pos)
+    SELECT * FROM unnest(
+      ${ids}::bigint[], ${types}::text[], ${icons}::text[], ${titles}::text[],
+      ${subs}::text[], ${amtStrs}::text[], ${poss}::boolean[])`
 }

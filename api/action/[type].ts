@@ -9,7 +9,10 @@ import { rateLimit } from '../_lib/ratelimit.js'
 import {
   AIRDROP_AMOUNT,
   PRESALE_PRICE,
+  SELL_PRICE,
+  WITHDRAW_FEE_PCT,
   SOL_PRICE,
+  addStakeLot,
   STAKE_DAYS,
   DAILY_RATE,
   addTxn,
@@ -84,7 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.airdropClaimed = true
         a.claimAddr = addr
         await saveAccount(userId, a)
-        await sql`UPDATE accounts SET staked_at = now() WHERE user_id = ${userId} AND staked_at IS NULL`
+        // New stake lot with its own 20-day clock.
+        await addStakeLot(userId, AIRDROP_AMOUNT, 'airdrop')
         await addTxn(userId, { icon: '🎁', title: 'Airdrop claimed', sub: `${AIRDROP_AMOUNT} $MOOLA staked`, amt: `+${AIRDROP_AMOUNT} $MOOLA`, pos: true })
         break
       }
@@ -97,7 +101,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.staked += amt
         a.available -= amt
         await saveAccount(userId, a)
-        await sql`UPDATE accounts SET staked_at = now() WHERE user_id = ${userId} AND staked_at IS NULL`
+        // New stake lot with its own 20-day clock.
+        await addStakeLot(userId, amt, 'stake')
         await addTxn(userId, { icon: '🔒', title: 'Staked', sub: `${fmt(amt, 3)} $MOOLA locked`, amt: `-${fmt(amt, 3)} avail`, pos: false })
         break
       }
@@ -122,6 +127,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         a.balance += r
         a.reward = 0
         await saveAccount(userId, a)
+        // Compounded rewards start their own fresh 20-day clock.
+        await addStakeLot(userId, r, 'compound')
         await addTxn(userId, { icon: '🔁', title: 'Rewards compounded', sub: 'added to stake', amt: `+${fmt(r, 4)} $MOOLA`, pos: true })
         break
       }
@@ -275,7 +282,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!amt || amt <= 0) return res.status(400).json({ error: 'Enter an amount to sell' })
         if (amt < 50) return res.status(400).json({ error: 'Minimum sell is 50 $MOOLA' })
         if (amt > a.available) return res.status(400).json({ error: 'Insufficient available balance' })
-        const usd = amt * PRESALE_PRICE // $0.01 per $MOOLA
+        // Sell at $0.0095 (5% below the $0.01 buy rate) — the platform's spread.
+        const usd = amt * SELL_PRICE
         a.available -= amt
         a.balance -= amt
         let recvStr: string
@@ -310,9 +318,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const clientKey = String(body.key || '').slice(0, 80) || null
         if (!wamt || wamt <= 0) return res.status(400).json({ error: 'Enter an amount to withdraw' })
         if (!SOLANA_ADDR_RE.test(waddr)) return res.status(400).json({ error: 'Enter a valid Solana address' })
-        // SOL min sits just above Solana's rent-exempt floor (~0.00089) so a
-        // transfer to a brand-new wallet still succeeds.
-        const MIN: Record<Asset, number> = { SOL: 0.001, USDT: 0.5, USDC: 0.5 }
+        // SOL min is set so the NET payout (after the 5% fee) still clears
+        // Solana's rent-exempt floor (~0.00089) for a brand-new wallet.
+        const MIN: Record<Asset, number> = { SOL: 0.002, USDT: 0.5, USDC: 0.5 }
         if (wamt < MIN[wasset]) {
           return res.status(400).json({ error: `Minimum withdrawal is ${MIN[wasset]} ${wasset}` })
         }
@@ -351,9 +359,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         await sql`UPDATE withdrawals SET status = 'pending' WHERE id = ${withdrawalId}`
 
+        // 5% platform fee: the full `wamt` was deducted above, but only the net
+        // (after fee) is paid on-chain. The fee stays in the payout wallet.
+        const netAmt = wasset === 'SOL'
+          ? Number((wamt * (1 - WITHDRAW_FEE_PCT / 100)).toFixed(9))
+          : Number((wamt * (1 - WITHDRAW_FEE_PCT / 100)).toFixed(6))
+
         let sig: string
         try {
-          sig = await solana.payout(waddr, wasset, wamt)
+          sig = await solana.payout(waddr, wasset, netAmt)
         } catch (e) {
           const pe = e as { broadcast?: boolean; signature?: string; message?: string }
           if (pe.broadcast) {
@@ -380,11 +394,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         await sql`UPDATE withdrawals SET status = 'sent', signature = ${sig} WHERE id = ${withdrawalId}`
+        const wdec = wasset === 'SOL' ? 4 : 2
         await addTxn(userId, {
           icon: '🏧',
           title: `Withdrew ${wasset}`,
-          sub: `${waddr.slice(0, 4)}…${waddr.slice(-4)}`,
-          amt: `-${fmt(wamt, wasset === 'SOL' ? 4 : 2)} ${wasset}`,
+          sub: `${waddr.slice(0, 4)}…${waddr.slice(-4)} · ${fmt(netAmt, wdec)} sent (5% fee)`,
+          amt: `-${fmt(wamt, wdec)} ${wasset}`,
           pos: false,
         })
         break

@@ -297,7 +297,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               <span style={css('font-size:18px;font-weight:800;color:#f2b34e')}>{v.sellRecvStr}</span>
             </div>
             <div onClick={v.doSell} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#f2b34e,#ff9d3c);color:#2a1a06;font-weight:800;font-size:16px;cursor:pointer')}>Sell to {v.sellAsset}</div>
-            <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Only unstaked $MOOLA can be sold · Min 50 $MOOLA · Sell fee 7%</div>
+            <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Only unstaked $MOOLA can be sold · Min 50 $MOOLA · Buy $0.01 / Sell $0.0095 (5% fee)</div>
           </div>
         </div>
       )}
@@ -331,8 +331,12 @@ export default function Overlays({ v }: { v: MoolaVals }) {
             <div style={css('font-size:13px;color:#92b8a3;margin-bottom:7px')}>Your Solana wallet address</div>
             <input value={v.wdAddr} onChange={v.onWdAddr} placeholder="Paste your SOL address" style={css("width:100%;box-sizing:border-box;padding:13px 14px;border-radius:13px;background:rgba(6,22,14,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:14px;outline:none;font-family:'Sora',sans-serif;margin-bottom:16px")} />
 
+            <div style={css('display:flex;align-items:center;justify-content:space-between;border-radius:14px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.14);padding:13px 16px;margin-bottom:16px')}>
+              <span style={css('font-size:13.5px;color:#92b8a3')}>You receive <span style={css('color:#7ea98f')}>(after 5% fee)</span></span>
+              <span style={css('font-size:16px;font-weight:800;color:#23d39a')}>{v.wdRecvStr}</span>
+            </div>
             <div onClick={v.doWithdraw} style={css('text-align:center;padding:15px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:16px;cursor:pointer;' + (v.withdrawing ? 'opacity:.6;pointer-events:none' : ''))}>{v.withdrawing ? 'Sending…' : 'Withdraw ' + v.wdAsset}</div>
-            <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>Sent on Solana · min 0.001 SOL / 0.5 USDT / 0.5 USDC · double-check your address</div>
+            <div style={css('text-align:center;font-size:11.5px;color:#7ea98f;margin-top:10px')}>5% withdrawal fee · min 0.002 SOL / 0.5 USDT / 0.5 USDC · double-check your address</div>
           </div>
         </div>
       )}

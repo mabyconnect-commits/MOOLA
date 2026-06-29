@@ -32,6 +32,7 @@ export interface Account {
   available: number
   reward: number
   airdrop: number
+  airdropLocked: number
   sol: number
   usdt: number
   usdc: number
@@ -60,11 +61,13 @@ export interface RefRow {
   refs: string
   buy: string
   comm: string
+  bonus: string
 }
 
 export interface ReferralData {
   code: string
   commissionStr: string
+  bonusStr: string
   rows: RefRow[]
 }
 
@@ -122,6 +125,17 @@ export interface AdminUser {
   sol: number
   usdt: number
   usdc: number
+}
+
+export interface DepositLookup {
+  user: { id: number; email: string; depositIndex: number | null }
+  depositAddress: string | null
+  onchain: { sol: number; usdt: number; usdc: number } | null
+  credited: { sol: number; usdt: number; usdc: number }
+  balances: { sol: number; usdt: number; usdc: number }
+  uncredited: { sol: number; usdt: number; usdc: number } | null
+  depositReady: boolean
+  sweepReady: boolean
 }
 
 export interface AuthChallenge {
@@ -186,5 +200,13 @@ export const api = {
     sweepAll: () => request<{ checked: number; swept: number }>('/admin/sweep-all', 'POST', {}),
     users: (q?: string) =>
       request<{ users: AdminUser[] }>('/admin/users' + (q ? '?q=' + encodeURIComponent(q) : ''), 'GET'),
+    depositLookup: (q: string) =>
+      request<DepositLookup>('/admin/deposit-lookup?q=' + encodeURIComponent(q), 'GET'),
+    depositReconcile: (id: number) =>
+      request<{ found: boolean; credited: { sol: number; usdt: number; usdc: number }; sweepNote: string | null }>(
+        '/admin/deposit-reconcile',
+        'POST',
+        { id },
+      ),
   },
 }

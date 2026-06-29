@@ -13,6 +13,7 @@ import {
   type AdminOverview,
   type AdminWithdrawal,
   type AdminUser,
+  type DepositLookup,
 } from './api'
 
 export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me' | 'admin'
@@ -33,6 +34,7 @@ interface MoolaState {
   staked: number
   available: number
   airdrop: number
+  airdropLocked: number
   balance: number
   sol: number
   usdt: number
@@ -87,6 +89,7 @@ interface MoolaState {
   refCode: string
   refInput: string
   refCommissionStr: string
+  refBonusStr: string
   refRowsData: RefRow[]
   stats: Stats
   stakedAt: number | null
@@ -95,6 +98,8 @@ interface MoolaState {
   adminWithdrawals: AdminWithdrawal[]
   adminUsers: AdminUser[]
   adminBusy: boolean
+  adminDepQuery: string
+  adminDepResult: DepositLookup | null
 }
 
 // Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
@@ -112,6 +117,7 @@ const initialState: MoolaState = {
   staked: 0,
   available: 0,
   airdrop: 0,
+  airdropLocked: 0,
   balance: 0,
   sol: 0,
   usdt: 0,
@@ -166,6 +172,7 @@ const initialState: MoolaState = {
   refCode: '',
   refInput: '',
   refCommissionStr: '0.000',
+  refBonusStr: '0.000',
   refRowsData: refRows,
   stats: BASE_STATS,
   stakedAt: null,
@@ -174,6 +181,8 @@ const initialState: MoolaState = {
   adminWithdrawals: [],
   adminUsers: [],
   adminBusy: false,
+  adminDepQuery: '',
+  adminDepResult: null,
 }
 
 function fmt(n: number, d: number): string {
@@ -272,6 +281,7 @@ export function useMoola() {
       available: acc.available,
       reward: acc.reward,
       airdrop: acc.airdrop,
+      airdropLocked: acc.airdropLocked ?? 0,
       sol: acc.sol,
       usdt: acc.usdt,
       usdc: acc.usdc,
@@ -285,7 +295,7 @@ export function useMoola() {
   // Merge server referral data (code, total commission, 10-level breakdown).
   const applyReferral = (r?: ReferralData) => {
     if (!r) return
-    set({ refCode: r.code, refCommissionStr: r.commissionStr, refRowsData: r.rows })
+    set({ refCode: r.code, refCommissionStr: r.commissionStr, refBonusStr: r.bonusStr, refRowsData: r.rows })
   }
 
   // Merge live launch stats (real presale activity + holder count).
@@ -782,6 +792,46 @@ export function useMoola() {
       flash(errMsg(e))
     }
   }
+  // Deposit investigation: look up a user's on-chain deposit address + balances.
+  const adminDepLookup = async () => {
+    const q = stateRef.current.adminDepQuery.trim()
+    if (!q) return flash('Enter an email or user id')
+    set({ adminBusy: true })
+    try {
+      const r = await api.admin.depositLookup(q)
+      set({ adminDepResult: r })
+    } catch (e) {
+      set({ adminDepResult: null })
+      flash(errMsg(e))
+    } finally {
+      set({ adminBusy: false })
+    }
+  }
+  // Credit any uncredited on-chain funds for the looked-up user, then sweep.
+  const adminDepReconcile = async () => {
+    const r = stateRef.current.adminDepResult
+    if (!r) return
+    if (stateRef.current.adminBusy) return
+    set({ adminBusy: true })
+    try {
+      const res = await api.admin.depositReconcile(r.user.id)
+      if (res.found) {
+        const parts = [
+          res.credited.sol > 0 ? res.credited.sol.toFixed(4) + ' SOL' : '',
+          res.credited.usdt > 0 ? res.credited.usdt.toFixed(2) + ' USDT' : '',
+          res.credited.usdc > 0 ? res.credited.usdc.toFixed(2) + ' USDC' : '',
+        ].filter(Boolean).join(' + ')
+        flash('✅ Credited ' + parts + (res.sweepNote ? ' · sweep: ' + res.sweepNote : ''))
+      } else {
+        flash('Nothing new to credit' + (res.sweepNote ? ' · sweep: ' + res.sweepNote : ''))
+      }
+      await adminDepLookup()
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ adminBusy: false })
+    }
+  }
 
   const v = {
     // screen flags
@@ -797,6 +847,11 @@ export function useMoola() {
     adminWithdrawals: s.adminWithdrawals,
     adminUsers: s.adminUsers,
     adminBusy: s.adminBusy,
+    adminDepQuery: s.adminDepQuery,
+    adminDepResult: s.adminDepResult,
+    onAdminDepQuery: onInput('adminDepQuery'),
+    adminDepLookup,
+    adminDepReconcile,
     openAdmin,
     adminRefresh: adminLoad,
     adminResolve,
@@ -842,6 +897,7 @@ export function useMoola() {
     refLink,
     refCode: s.refCode,
     refCommissionStr: s.refCommissionStr,
+    refBonusStr: s.refBonusStr,
     roadmap,
     faqs,
     refLevels,
@@ -872,6 +928,8 @@ export function useMoola() {
     stakedStr: fmt(s.staked, 3),
     availStr: fmt(s.available, 3),
     airdropBalStr: fmt(s.airdrop, 0),
+    airdropLockedStr: fmt(s.airdropLocked, 3),
+    hasLockedAirdrop: s.airdropLocked > 0,
     usdtStr: fmt(s.balance * 0.01, 2),
     solStr: fmt(s.sol, 4),
     usdtBalStr: fmt(s.usdt, 2),
@@ -966,11 +1024,12 @@ export function useMoola() {
     sell: s.sell,
     sellAmt: s.sellAmt,
     sellAsset: s.sellAsset,
-    sellSolStr: (((parseFloat(s.sellAmt) || 0) * 0.01) / 152).toFixed(4),
+    // Sell quote uses the $0.0095 sell rate (5% below the $0.01 buy rate).
+    sellSolStr: (((parseFloat(s.sellAmt) || 0) * 0.0095) / 152).toFixed(4),
     sellRecvStr:
       s.sellAsset === 'SOL'
-        ? (((parseFloat(s.sellAmt) || 0) * 0.01) / 152).toFixed(4) + ' SOL'
-        : fmt((parseFloat(s.sellAmt) || 0) * 0.01, 2) + ' ' + s.sellAsset,
+        ? (((parseFloat(s.sellAmt) || 0) * 0.0095) / 152).toFixed(4) + ' SOL'
+        : fmt((parseFloat(s.sellAmt) || 0) * 0.0095, 2) + ' ' + s.sellAsset,
     setSellAsset: (a: 'SOL' | 'USDT' | 'USDC') => set({ sellAsset: a }),
     openSell: () => set({ sell: true, wallet: false }),
     closeSell: () => set({ sell: false }),
@@ -984,6 +1043,9 @@ export function useMoola() {
     wdAddr: s.wdAddr,
     withdrawing: s.withdrawing,
     wdBalStr: fmt(s.wdAsset === 'SOL' ? s.sol : s.wdAsset === 'USDT' ? s.usdt : s.usdc, s.wdAsset === 'SOL' ? 4 : 2),
+    // Net the user actually receives after the 5% withdrawal fee.
+    wdRecvStr:
+      fmt((parseFloat(s.wdAmt) || 0) * 0.95, s.wdAsset === 'SOL' ? 4 : 2) + ' ' + s.wdAsset,
     openWithdraw: () =>
       set({
         withdraw: true,

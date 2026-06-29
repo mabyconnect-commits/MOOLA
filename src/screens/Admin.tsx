@@ -22,6 +22,7 @@ function Wallet({ label, address, bal }: { label: string; address: string; bal: 
 
 export default function Admin({ v }: { v: MoolaVals }) {
   const o = v.adminOverview
+  const dep = v.adminDepResult
   const pending = v.adminWithdrawals.filter((w) => w.status === 'pending')
   return (
     <div style={css('position:relative;padding:18px 16px 120px')}>
@@ -69,6 +70,35 @@ export default function Admin({ v }: { v: MoolaVals }) {
 
       {/* Sweep all */}
       <div onClick={v.adminSweepAll} style={css('text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:18px;' + (v.adminBusy ? 'opacity:.6;pointer-events:none' : ''))}>{v.adminBusy ? 'Working…' : '🧹 Sweep all deposit wallets'}</div>
+
+      {/* Deposit lookup & reconcile — "I deposited but it didn't reflect" */}
+      <div style={css('border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);padding:14px;margin-bottom:18px')}>
+        <div style={css('font-size:14px;font-weight:700;margin-bottom:4px')}>🔍 Deposit lookup</div>
+        <div style={css('font-size:11.5px;color:#7ea98f;margin-bottom:10px')}>Find a user's deposit address & credit any funds sitting there.</div>
+        <div style={css('display:flex;gap:8px;margin-bottom:10px')}>
+          <input value={v.adminDepQuery} onChange={v.onAdminDepQuery} placeholder="email or user id" style={css("flex:1;box-sizing:border-box;padding:11px 13px;border-radius:11px;background:rgba(6,22,14,.55);border:1px solid rgba(110,200,150,.2);color:#eafff4;font-size:13.5px;outline:none;font-family:'Sora',sans-serif")} />
+          <div onClick={v.adminDepLookup} style={css('padding:11px 16px;border-radius:11px;border:1px solid rgba(110,200,150,.3);font-size:13px;font-weight:700;cursor:pointer;' + (v.adminBusy ? 'opacity:.6;pointer-events:none' : ''))}>Look up</div>
+        </div>
+        {dep && (
+          <div style={css('border-radius:12px;background:rgba(8,16,38,.4);padding:12px;font-size:12.5px')}>
+            <div style={css('font-weight:700;margin-bottom:6px')}>{dep.user.email} <span style={css('color:#7ea98f;font-weight:400')}>#{dep.user.id}</span></div>
+            <div style={css('color:#92b8a3;margin-bottom:2px')}>Deposit address</div>
+            <div style={css('color:#cfe7da;word-break:break-all;margin-bottom:8px')}>{dep.depositAddress || (dep.user.depositIndex == null ? '— never generated (user never opened deposit) —' : '— unavailable —')}</div>
+            <div style={css('display:grid;grid-template-columns:1fr 1fr;gap:6px 10px')}>
+              <div style={css('color:#92b8a3')}>On-chain now</div>
+              <div style={css('text-align:right')}>{dep.onchain ? `◎${n(dep.onchain.sol,4)} · ₮${n(dep.onchain.usdt)} · $${n(dep.onchain.usdc)}` : '—'}</div>
+              <div style={css('color:#92b8a3')}>Already credited</div>
+              <div style={css('text-align:right')}>◎{n(dep.credited.sol,4)} · ₮{n(dep.credited.usdt)} · ${n(dep.credited.usdc)}</div>
+              <div style={css('color:#92b8a3')}>In-app balance</div>
+              <div style={css('text-align:right')}>◎{n(dep.balances.sol,4)} · ₮{n(dep.balances.usdt)} · ${n(dep.balances.usdc)}</div>
+              <div style={css('color:#bda6ff')}>Uncredited</div>
+              <div style={css('text-align:right;color:#bda6ff;font-weight:700')}>{dep.uncredited ? `◎${n(dep.uncredited.sol,4)} · ₮${n(dep.uncredited.usdt)} · $${n(dep.uncredited.usdc)}` : '—'}</div>
+            </div>
+            <div onClick={v.adminDepReconcile} style={css('text-align:center;margin-top:11px;padding:11px;border-radius:11px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:13.5px;cursor:pointer;' + (v.adminBusy ? 'opacity:.6;pointer-events:none' : ''))}>{v.adminBusy ? 'Working…' : '⬇️ Credit deposit & sweep'}</div>
+            {!dep.depositReady && <div style={css('text-align:center;font-size:11px;color:#ff8f8f;margin-top:7px')}>Deposit system not configured (RPC/MASTER/TREASURY).</div>}
+          </div>
+        )}
+      </div>
 
       {/* Pending withdrawals to resolve */}
       <div style={css('font-size:15px;font-weight:700;margin-bottom:10px')}>Pending withdrawals ({pending.length})</div>

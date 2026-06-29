@@ -3,7 +3,7 @@ import { ensureSchema, sql } from '../_lib/db.js'
 import { EMAIL_RE, hashPassword, signToken, verifyPassword } from '../_lib/auth.js'
 import { sendVerificationEmail } from '../_lib/email.js'
 import { ensureAccount, loadAccount, loadTxns } from '../_lib/economics.js'
-import { buildUpline, genRefCode, loadReferral, resolveReferrer } from '../_lib/referral.js'
+import { buildUpline, distributeAirdropCommission, genRefCode, loadReferral, resolveReferrer } from '../_lib/referral.js'
 import { clientIp, rateLimit } from '../_lib/ratelimit.js'
 import { isAdminEmail } from '../_lib/admin.js'
 
@@ -106,6 +106,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
           await sql`UPDATE users SET email_verified = TRUE, verify_code = NULL, verify_expires = NULL WHERE id = ${user.id}`
           await ensureAccount(user.id)
+          // First successful registration — pay the airdrop referral bonus up
+          // this user's upline (auto-staked). Runs exactly once, here.
+          await distributeAirdropCommission(user.id)
         }
 
         const token = signToken(user.id)
