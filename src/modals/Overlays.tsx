@@ -239,7 +239,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
 
             <div style={css('display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;background:rgba(15,40,28,.6);border:1px solid rgba(110,200,150,.16);margin-bottom:11px')}>
               <div style={css('width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#9945ff,#14f195);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff')}>◎</div>
-              <div style={css('flex:1')}><div style={css('font-size:11.5px;color:#92b8a3')}>Network</div><div style={css('font-size:14.5px;font-weight:700')}>Solana (SPL)</div></div>
+              <div style={css('flex:1')}><div style={css('font-size:11.5px;color:#92b8a3')}>Network</div><div style={css('font-size:14.5px;font-weight:700')}>Solana</div></div>
               <div style={css('font-size:11px;color:#f2b34e;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(242,179,78,.14)')}>{v.depositAsset} only</div>
             </div>
 
@@ -250,7 +250,7 @@ export default function Overlays({ v }: { v: MoolaVals }) {
             </div>
 
             <div style={css('border-radius:14px;background:rgba(15,40,28,.5);border:1px solid rgba(110,200,150,.14);padding:15px 16px;margin-bottom:18px')}>
-              <div style={css('display:flex;gap:10px;align-items:flex-start;margin-bottom:11px')}><span style={css('color:#23d39a;font-weight:800')}>1.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Send {v.depositAsset} on the <b style={css('color:#eafff4')}>Solana (SPL)</b> network to the address above — from any Solana wallet or exchange.</span></div>
+              <div style={css('display:flex;gap:10px;align-items:flex-start;margin-bottom:11px')}><span style={css('color:#23d39a;font-weight:800')}>1.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Send {v.depositAsset} on the <b style={css('color:#eafff4')}>Solana</b> network to the address above — from any Solana wallet or exchange.</span></div>
               <div style={css('display:flex;gap:10px;align-items:flex-start;margin-bottom:11px')}><span style={css('color:#23d39a;font-weight:800')}>2.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Enter the amount you sent above, then tap confirm.</span></div>
               <div style={css('display:flex;gap:10px;align-items:flex-start')}><span style={css('color:#23d39a;font-weight:800')}>3.</span><span style={css('font-size:13px;color:#cfe7da;line-height:1.5')}>Your {v.depositAsset} balance updates and is ready to use.</span></div>
             </div>
