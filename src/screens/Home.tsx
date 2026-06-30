@@ -34,7 +34,7 @@ export default function Home({ v }: { v: MoolaVals }) {
       </div>
 
       {/* telegram banner */}
-      <div style={css('display:flex;align-items:center;gap:13px;padding:14px;border-radius:16px;background:rgba(16,44,32,.55);border:1px solid rgba(110,200,150,.16);margin-bottom:22px')}>
+      <div style={css('display:flex;align-items:center;gap:13px;padding:14px;border-radius:16px;background:rgba(16,44,32,.55);border:1px solid rgba(110,200,150,.16);margin-bottom:12px')}>
         <div style={css('width:42px;height:42px;border-radius:50%;background:linear-gradient(150deg,#2aabee,#1c8adb);display:flex;align-items:center;justify-content:center;font-size:22px')}>✈️</div>
         <div style={css('flex:1')}>
           <div style={css('font-size:12px;color:#92b8a3')}>$MOOLA Community</div>
@@ -44,6 +44,20 @@ export default function Home({ v }: { v: MoolaVals }) {
           <div style={css('padding:9px 20px;border-radius:20px;background:rgba(35,211,154,.14);border:1px solid rgba(35,211,154,.35);color:#23d39a;font-weight:700;font-size:14px;cursor:default')}>✓ Joined</div>
         ) : (
           <div onClick={v.joinTelegram} style={css('padding:9px 22px;border-radius:20px;border:1px solid #23d39a;color:#23d39a;font-weight:600;font-size:14px;cursor:pointer')}>Join</div>
+        )}
+      </div>
+
+      {/* x (twitter) banner */}
+      <div style={css('display:flex;align-items:center;gap:13px;padding:14px;border-radius:16px;background:rgba(16,44,32,.55);border:1px solid rgba(110,200,150,.16);margin-bottom:22px')}>
+        <div style={css('width:42px;height:42px;border-radius:50%;background:linear-gradient(150deg,#1a1a1a,#000);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:800')}>𝕏</div>
+        <div style={css('flex:1')}>
+          <div style={css('font-size:12px;color:#92b8a3')}>$MOOLA on X</div>
+          <div style={css('font-size:17px;font-weight:700')}>Follow on X</div>
+        </div>
+        {v.joinedX ? (
+          <div style={css('padding:9px 20px;border-radius:20px;background:rgba(35,211,154,.14);border:1px solid rgba(35,211,154,.35);color:#23d39a;font-weight:700;font-size:14px;cursor:default')}>✓ Followed</div>
+        ) : (
+          <div onClick={v.joinX} style={css('padding:9px 22px;border-radius:20px;border:1px solid #23d39a;color:#23d39a;font-weight:600;font-size:14px;cursor:pointer')}>Follow</div>
         )}
       </div>
 

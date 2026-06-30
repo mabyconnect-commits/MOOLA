@@ -85,6 +85,7 @@ interface MoolaState {
   demoCode: string
   showPw: boolean
   joinedTg: boolean
+  joinedX: boolean
   txns: ApiTxn[]
   refCode: string
   refInput: string
@@ -168,6 +169,7 @@ const initialState: MoolaState = {
   demoCode: '',
   showPw: false,
   joinedTg: false,
+  joinedX: false,
   txns: [],
   refCode: '',
   refInput: '',
@@ -247,8 +249,9 @@ export function useMoola() {
       // If we already hold a session token, boot straight into a loading state
       // and hydrate from the server rather than flashing the welcome screen.
       booting: hasSession,
-      // Remember whether the user already joined Telegram (gates the claim).
+      // Remember whether the user already joined Telegram + X (both gate the claim).
       joinedTg: typeof window !== 'undefined' && localStorage.getItem('moola_tg') === '1',
+      joinedX: typeof window !== 'undefined' && localStorage.getItem('moola_x') === '1',
       // A referral link should drop the visitor on signup with the code filled.
       refInput: incomingRef,
       authView: !hasSession && incomingRef ? 'signup' : initialState.authView,
@@ -1082,6 +1085,21 @@ export function useMoola() {
       }
       set({ joinedTg: true })
       flash('Opening Telegram…')
+    },
+    joinedX: s.joinedX,
+    joinX: () => {
+      try {
+        window.open('https://x.com/MoolaAirdrop', '_blank')
+      } catch {
+        /* ignore */
+      }
+      try {
+        localStorage.setItem('moola_x', '1')
+      } catch {
+        /* ignore */
+      }
+      set({ joinedX: true })
+      flash('Opening X…')
     },
     // history / settings
     history: s.history,

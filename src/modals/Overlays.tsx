@@ -81,11 +81,17 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               <div style={css('font-size:13px;color:#92b8a3;line-height:1.55;margin-bottom:18px')}>Your airdrop auto-stakes on claim and starts earning <b style={css('color:#cfe7da')}>2.05% daily</b> instantly.</div>
               {v.claimStep1 && !v.joinedTg && (
                 <>
-                  <div style={css('font-size:12.5px;color:#9fefc6;background:rgba(34,158,217,.12);border:1px solid rgba(34,158,217,.4);border-radius:12px;padding:10px 13px;margin-bottom:12px;line-height:1.5')}>📣 Join our Telegram first to unlock your airdrop claim.</div>
+                  <div style={css('font-size:12.5px;color:#9fefc6;background:rgba(34,158,217,.12);border:1px solid rgba(34,158,217,.4);border-radius:12px;padding:10px 13px;margin-bottom:12px;line-height:1.5')}>📣 Join our Telegram + follow on X to unlock your airdrop claim.</div>
                   <div onClick={v.joinTelegram} style={css('padding:16px;border-radius:14px;background:linear-gradient(120deg,#229ED9,#1b87c4);color:#eafff4;font-weight:800;font-size:16px;cursor:pointer;animation:btnGlow 1.8s ease-in-out infinite')}>📣 Join Telegram to Claim</div>
                 </>
               )}
-              {v.claimStep1 && v.joinedTg && (
+              {v.claimStep1 && v.joinedTg && !v.joinedX && (
+                <>
+                  <div style={css('font-size:12.5px;color:#9fefc6;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:10px 13px;margin-bottom:12px;line-height:1.5')}>✓ Telegram joined. Now follow us on X to unlock your claim.</div>
+                  <div onClick={v.joinX} style={css('padding:16px;border-radius:14px;background:linear-gradient(120deg,#1a1a1a,#000);color:#eafff4;font-weight:800;font-size:16px;cursor:pointer;animation:btnGlow 1.8s ease-in-out infinite;border:1px solid rgba(255,255,255,.25)')}>𝕏 Follow on X to Claim</div>
+                </>
+              )}
+              {v.claimStep1 && v.joinedTg && v.joinedX && (
                 <div onClick={v.claimAirdrop} style={css('padding:16px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:16px;cursor:pointer;animation:btnGlow 1.8s ease-in-out infinite')}>🎁 Claim &amp; Stake</div>
               )}
               {v.claimStep2 && (
