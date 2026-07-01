@@ -81,11 +81,17 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               <div style={css('font-size:13px;color:#92b8a3;line-height:1.55;margin-bottom:18px')}>Your airdrop auto-stakes on claim and starts earning <b style={css('color:#cfe7da')}>2.05% daily</b> instantly.</div>
               {v.claimStep1 && !v.joinedTg && (
                 <>
-                  <div style={css('font-size:12.5px;color:#9fefc6;background:rgba(34,158,217,.12);border:1px solid rgba(34,158,217,.4);border-radius:12px;padding:10px 13px;margin-bottom:12px;line-height:1.5')}>📣 Join our Telegram first to unlock your airdrop claim.</div>
+                  <div style={css('font-size:12.5px;color:#9fefc6;background:rgba(34,158,217,.12);border:1px solid rgba(34,158,217,.4);border-radius:12px;padding:10px 13px;margin-bottom:12px;line-height:1.5')}>📣 Join our Telegram + follow on X to unlock your airdrop claim.</div>
                   <div onClick={v.joinTelegram} style={css('padding:16px;border-radius:14px;background:linear-gradient(120deg,#229ED9,#1b87c4);color:#eafff4;font-weight:800;font-size:16px;cursor:pointer;animation:btnGlow 1.8s ease-in-out infinite')}>📣 Join Telegram to Claim</div>
                 </>
               )}
-              {v.claimStep1 && v.joinedTg && (
+              {v.claimStep1 && v.joinedTg && !v.joinedX && (
+                <>
+                  <div style={css('font-size:12.5px;color:#9fefc6;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:10px 13px;margin-bottom:12px;line-height:1.5')}>✓ Telegram joined. Now follow us on X to unlock your claim.</div>
+                  <div onClick={v.joinX} style={css('padding:16px;border-radius:14px;background:linear-gradient(120deg,#1a1a1a,#000);color:#eafff4;font-weight:800;font-size:16px;cursor:pointer;animation:btnGlow 1.8s ease-in-out infinite;border:1px solid rgba(255,255,255,.25)')}>𝕏 Follow on X to Claim</div>
+                </>
+              )}
+              {v.claimStep1 && v.joinedTg && v.joinedX && (
                 <div onClick={v.claimAirdrop} style={css('padding:16px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:16px;cursor:pointer;animation:btnGlow 1.8s ease-in-out infinite')}>🎁 Claim &amp; Stake</div>
               )}
               {v.claimStep2 && (
@@ -96,6 +102,22 @@ export default function Overlays({ v }: { v: MoolaVals }) {
                 </>
               )}
               <div onClick={v.closeClaim} style={css('margin-top:12px;font-size:13px;color:#7ea98f;cursor:pointer')}>Maybe later</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== FOLLOW ON X (post-claim reminder) ===== */}
+      {v.xPopup && (
+        <div onClick={v.closeXPopup} style={css('position:fixed;inset:0;z-index:55;background:rgba(3,8,5,.74);display:flex;justify-content:center;align-items:center;padding:20px')}>
+          <div onClick={v.stop} style={css('position:relative;width:380px;max-width:100%')}>
+            <div style={css('position:absolute;inset:-22px;border-radius:38px;background:radial-gradient(circle,rgba(255,255,255,.22),transparent 65%);filter:blur(20px);pointer-events:none')}></div>
+            <div style={css('position:relative;border-radius:22px;background:linear-gradient(180deg,#0f1f16,#0a1a12);border:1px solid rgba(255,255,255,.18);padding:26px 22px;text-align:center;animation:pop .3s ease')}>
+              <div style={css('display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:linear-gradient(150deg,#1a1a1a,#000);color:#fff;font-size:30px;font-weight:900;margin-bottom:12px;border:1px solid rgba(255,255,255,.2);box-shadow:0 8px 24px rgba(0,0,0,.5)')}>𝕏</div>
+              <div style={css('font-size:20px;font-weight:800;margin-bottom:6px')}>Follow $MOOLA on X</div>
+              <div style={css('font-size:13.5px;color:#92b8a3;line-height:1.55;margin-bottom:18px')}>Stay in the loop on drops, listings, and launch news. It takes 2 seconds.</div>
+              <div onClick={v.joinX} style={css('padding:15px;border-radius:14px;background:linear-gradient(120deg,#1a1a1a,#000);color:#eafff4;font-weight:800;font-size:16px;cursor:pointer;border:1px solid rgba(255,255,255,.25);animation:btnGlow 1.8s ease-in-out infinite')}>𝕏 Follow on X</div>
+              <div onClick={v.closeXPopup} style={css('margin-top:12px;font-size:13px;color:#7ea98f;cursor:pointer')}>Later</div>
             </div>
           </div>
         </div>

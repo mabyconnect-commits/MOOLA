@@ -85,6 +85,8 @@ interface MoolaState {
   demoCode: string
   showPw: boolean
   joinedTg: boolean
+  joinedX: boolean
+  xPopup: boolean
   txns: ApiTxn[]
   refCode: string
   refInput: string
@@ -168,6 +170,8 @@ const initialState: MoolaState = {
   demoCode: '',
   showPw: false,
   joinedTg: false,
+  joinedX: false,
+  xPopup: false,
   txns: [],
   refCode: '',
   refInput: '',
@@ -247,8 +251,9 @@ export function useMoola() {
       // If we already hold a session token, boot straight into a loading state
       // and hydrate from the server rather than flashing the welcome screen.
       booting: hasSession,
-      // Remember whether the user already joined Telegram (gates the claim).
+      // Remember whether the user already joined Telegram + X (both gate the claim).
       joinedTg: typeof window !== 'undefined' && localStorage.getItem('moola_tg') === '1',
+      joinedX: typeof window !== 'undefined' && localStorage.getItem('moola_x') === '1',
       // A referral link should drop the visitor on signup with the code filled.
       refInput: incomingRef,
       authView: !hasSession && incomingRef ? 'signup' : initialState.authView,
@@ -374,6 +379,30 @@ export function useMoola() {
     }, 200)
     return () => clearInterval(t)
   }, [])
+
+  // Surface the airdrop tasks as a popup so users can't miss them. Runs once
+  // per session for any authed user who hasn't followed us on X yet:
+  //   • airdrop still unclaimed → open the claim modal (walks TG + X gate)
+  //   • airdrop already claimed → open the Follow-on-X reminder popup
+  useEffect(() => {
+    if (!s.authed || s.booting) return
+    if (s.joinedX) return
+    try {
+      if (sessionStorage.getItem('moola_x_prompted') === '1') return
+      sessionStorage.setItem('moola_x_prompted', '1')
+    } catch {
+      /* ignore */
+    }
+    const t = setTimeout(() => {
+      if (stateRef.current.airdropClaimed) {
+        set({ xPopup: true })
+      } else {
+        set({ claim: true, claimStep: 1 })
+      }
+    }, 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.authed, s.booting])
 
   // When the user returns to the tab (or refocuses the window), re-sync from the
   // server so balances + the reward base reflect everything that accrued while
@@ -1082,6 +1111,23 @@ export function useMoola() {
       }
       set({ joinedTg: true })
       flash('Opening Telegram…')
+    },
+    joinedX: s.joinedX,
+    xPopup: s.xPopup,
+    closeXPopup: () => set({ xPopup: false }),
+    joinX: () => {
+      try {
+        window.open('https://x.com/moolaairdrop?s=21', '_blank')
+      } catch {
+        /* ignore */
+      }
+      try {
+        localStorage.setItem('moola_x', '1')
+      } catch {
+        /* ignore */
+      }
+      set({ joinedX: true, xPopup: false })
+      flash('Opening X…')
     },
     // history / settings
     history: s.history,
