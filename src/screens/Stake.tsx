@@ -12,7 +12,7 @@ export default function Stake({ v }: { v: MoolaVals }) {
         </div>
         <div onClick={v.openWallet} style={css('display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:22px;background:rgba(22,52,38,.6);border:1px solid rgba(110,200,150,.22);cursor:pointer')}>
           <span style={css('font-size:15px')}>💳</span>
-          <span style={css('font-weight:600;font-size:15px')}>{v.balanceStr}</span>
+          <span style={css('font-weight:600;font-size:15px')}>{v.availStr}</span>
           <span style={css('color:#7ea98f;font-size:11px')}>▼</span>
         </div>
       </div>

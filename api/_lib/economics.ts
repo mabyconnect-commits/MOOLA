@@ -223,23 +223,25 @@ export interface Stats {
   total: number
 }
 
-/** Increment the global presale counters when someone buys. */
-export async function addPresale(tokens: number, usd: number): Promise<void> {
-  await sql`INSERT INTO app_meta (key, val) VALUES ('presale_sold', ${String(tokens)})
-    ON CONFLICT (key) DO UPDATE SET val = (COALESCE(app_meta.val::numeric, 0) + ${tokens})::text`
-  await sql`INSERT INTO app_meta (key, val) VALUES ('presale_raised', ${String(usd)})
-    ON CONFLICT (key) DO UPDATE SET val = (COALESCE(app_meta.val::numeric, 0) + ${usd})::text`
-}
-
-/** Live launch stats: baseline + real presale activity + real holder count. */
+/**
+ * Live launch stats: a marketing baseline plus REAL on-app activity.
+ *
+ * `sold` is derived from the actual $MOOLA distributed across every account
+ * (SUM(balance)), so it reflects all genuine holders the moment they hold
+ * tokens and grows as more is bought — no separate counter to drift out of
+ * sync. `raised` stays consistent at sold × presale price, and `holders`
+ * counts everyone actually holding tokens.
+ */
 export async function loadStats(): Promise<Stats> {
-  const sold = await sql<{ val: string }>`SELECT val FROM app_meta WHERE key = 'presale_sold'`
-  const raised = await sql<{ val: string }>`SELECT val FROM app_meta WHERE key = 'presale_raised'`
-  const holders = await sql<{ c: number }>`SELECT COUNT(*)::int AS c FROM accounts WHERE balance + staked > 0`
+  const { rows } = await sql<{ sold: number; holders: number }>`
+    SELECT COALESCE(SUM(balance), 0)::float8 AS sold,
+           COUNT(*) FILTER (WHERE balance + staked > 0)::int AS holders
+    FROM accounts`
+  const realSold = Number(rows[0]?.sold || 0)
   return {
-    raised: BASE_RAISED + Number(raised.rows[0]?.val || 0),
-    holders: BASE_HOLDERS + Number(holders.rows[0]?.c || 0),
-    sold: BASE_SOLD + Number(sold.rows[0]?.val || 0),
+    raised: BASE_RAISED + realSold * PRESALE_PRICE,
+    holders: BASE_HOLDERS + Number(rows[0]?.holders || 0),
+    sold: BASE_SOLD + realSold,
     total: PRESALE_TOTAL,
   }
 }

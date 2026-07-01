@@ -20,7 +20,6 @@ import {
   loadAccount,
   loadTxns,
   saveAccount,
-  addPresale,
   loadStats,
 } from '../_lib/economics.js'
 
@@ -162,8 +161,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await addTxn(userId, { icon: '🛒', title: 'Presale buy', sub: `${fmt(amt, ccy === 'SOL' ? 4 : 2)} ${ccy}`, amt: `+${fmt(tokens, 0)} $MOOLA`, pos: true })
         // Pay 10-level referral commission on the purchased tokens.
         await distributeCommission(userId, tokens)
-        // Move the global launch stats (sold tokens + USD raised).
-        await addPresale(tokens, usd)
         break
       }
 
