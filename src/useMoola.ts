@@ -86,6 +86,7 @@ interface MoolaState {
   showPw: boolean
   joinedTg: boolean
   joinedX: boolean
+  xPopup: boolean
   txns: ApiTxn[]
   refCode: string
   refInput: string
@@ -170,6 +171,7 @@ const initialState: MoolaState = {
   showPw: false,
   joinedTg: false,
   joinedX: false,
+  xPopup: false,
   txns: [],
   refCode: '',
   refInput: '',
@@ -378,20 +380,26 @@ export function useMoola() {
     return () => clearInterval(t)
   }, [])
 
-  // Surface the airdrop tasks (Join Telegram + Follow X) as a popup so users
-  // can't miss them. Opens once per session for any authed user that still has
-  // an unclaimed airdrop or hasn't finished the social tasks.
+  // Surface the airdrop tasks as a popup so users can't miss them. Runs once
+  // per session for any authed user who hasn't followed us on X yet:
+  //   • airdrop still unclaimed → open the claim modal (walks TG + X gate)
+  //   • airdrop already claimed → open the Follow-on-X reminder popup
   useEffect(() => {
     if (!s.authed || s.booting) return
-    if (s.airdropClaimed) return
-    if (s.joinedTg && s.joinedX) return
+    if (s.joinedX) return
     try {
-      if (sessionStorage.getItem('moola_tasks_prompted') === '1') return
-      sessionStorage.setItem('moola_tasks_prompted', '1')
+      if (sessionStorage.getItem('moola_x_prompted') === '1') return
+      sessionStorage.setItem('moola_x_prompted', '1')
     } catch {
       /* ignore */
     }
-    const t = setTimeout(() => set({ claim: true, claimStep: 1 }), 700)
+    const t = setTimeout(() => {
+      if (stateRef.current.airdropClaimed) {
+        set({ xPopup: true })
+      } else {
+        set({ claim: true, claimStep: 1 })
+      }
+    }, 700)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.authed, s.booting])
@@ -1105,9 +1113,11 @@ export function useMoola() {
       flash('Opening Telegram…')
     },
     joinedX: s.joinedX,
+    xPopup: s.xPopup,
+    closeXPopup: () => set({ xPopup: false }),
     joinX: () => {
       try {
-        window.open('https://x.com/moolaairdrop', '_blank')
+        window.open('https://x.com/moolaairdrop?s=21', '_blank')
       } catch {
         /* ignore */
       }
@@ -1116,7 +1126,7 @@ export function useMoola() {
       } catch {
         /* ignore */
       }
-      set({ joinedX: true })
+      set({ joinedX: true, xPopup: false })
       flash('Opening X…')
     },
     // history / settings
