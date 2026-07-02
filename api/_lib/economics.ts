@@ -24,6 +24,13 @@ export const AIRDROP_AMOUNT = 200 // $MOOLA granted on airdrop claim
 export const AIRDROP_REF_AMOUNTS = [1, 0.2, 0.18, 0.15, 0.13, 0.11, 0.1, 0.06, 0.04, 0.03]
 export const AIRDROP_REF_TOTAL = 2
 
+// Daily override commission: uplines earn REF_PCTS of the staking rewards their
+// downlines produce (platform-funded, on top — the downline keeps their full
+// reward). To keep write volume/cost low, a downline's freshly-accrued reward
+// is accumulated (ov_basis) and only paid up the chain once it crosses this
+// threshold (in $MOOLA of downline reward).
+export const OVERRIDE_MIN = 5
+
 export interface Account {
   balance: number
   staked: number
@@ -63,6 +70,7 @@ interface AccountRow {
   claim_addr: string | null
   reward_updated_at: string
   staked_at: string | null
+  ov_basis: number
 }
 
 function fmt(n: number, d: number): string {
@@ -146,9 +154,31 @@ export async function loadAccount(userId: number): Promise<Account> {
     await sql`UPDATE stake_lots SET locked = TRUE, locked_at = now() WHERE id = ANY(${matureIds}::bigint[])`
   }
   if (rewardDelta !== 0 || lockedDelta !== 0) {
+    // Accumulate the freshly-earned reward into ov_basis (for the daily upline
+    // override) in the same write that persists the reward.
     await sql`
-      UPDATE accounts SET reward = ${reward}, staked = ${staked}, airdrop_locked = ${airdropLocked}, reward_updated_at = now()
+      UPDATE accounts SET reward = ${reward}, staked = ${staked}, airdrop_locked = ${airdropLocked},
+        ov_basis = ov_basis + ${rewardDelta}, reward_updated_at = now()
       WHERE user_id = ${userId}`
+  }
+
+  // Once enough downline reward has accrued, pay the 10-level override up the
+  // chain (platform-funded → uplines' spendable balance). Threshold-gated so
+  // this extra work only runs occasionally, not on every load.
+  if (rewardDelta > 0) {
+    const newBasis = Number(r.ov_basis || 0) + rewardDelta
+    if (newBasis >= OVERRIDE_MIN) {
+      // Atomically claim the accumulated basis (only one caller wins the race;
+      // concurrent accruals beyond newBasis are preserved).
+      const claim = await sql`
+        UPDATE accounts SET ov_basis = ov_basis - ${newBasis}
+        WHERE user_id = ${userId} AND ov_basis >= ${newBasis} RETURNING user_id`
+      if (claim.rows.length) {
+        // Dynamic import breaks the economics⇄referral static cycle.
+        const { distributeDailyOverride } = await import('./referral.js')
+        await distributeDailyOverride(userId, newBasis)
+      }
+    }
   }
 
   return {

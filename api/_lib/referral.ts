@@ -215,3 +215,55 @@ export async function distributeCommission(buyerId: number, tokens: number): Pro
       ${ids}::bigint[], ${types}::text[], ${icons}::text[], ${titles}::text[],
       ${subs}::text[], ${amtStrs}::text[], ${poss}::boolean[])`
 }
+
+// Daily override: pay the 10-level % of a downline's freshly-earned staking
+// reward up their upline. Platform-funded (the downline is NOT debited) and
+// credited to each upline's spendable balance. `basisReward` is the amount of
+// downline reward this payout is computed on.
+export async function distributeDailyOverride(downlineId: number, basisReward: number): Promise<void> {
+  if (basisReward <= 0) return
+  const u = await sql<{ upline: (number | string)[] | null }>`SELECT upline FROM users WHERE id = ${downlineId}`
+  const upline = (u.rows[0]?.upline || []).map(Number)
+  if (!upline.length) return
+
+  const ids: number[] = []
+  const amts: number[] = []
+  const levels: number[] = []
+  for (let i = 0; i < upline.length && i < 10; i++) {
+    const amt = basisReward * REF_PCTS[i]
+    if (amt <= 0) continue
+    ids.push(upline[i])
+    amts.push(amt)
+    levels.push(i + 1)
+  }
+  if (!ids.length) return
+
+  // Make sure each earner has an accounts row, then credit spendable balance.
+  await sql`INSERT INTO accounts (user_id) SELECT unnest(${ids}::bigint[]) ON CONFLICT (user_id) DO NOTHING`
+  await sql`
+    UPDATE accounts SET available = available + d.amt, balance = balance + d.amt
+    FROM (SELECT unnest(${ids}::bigint[]) AS user_id, unnest(${amts}::float8[]) AS amt) d
+    WHERE accounts.user_id = d.user_id`
+
+  // Record on the referral ledger (as commission) so it shows on the ref list.
+  const oFromUsers = ids.map(() => downlineId)
+  const oZeros = ids.map(() => 0)
+  await sql`
+    INSERT INTO referral_earnings (beneficiary, from_user, level, buy_tokens, commission, bonus)
+    SELECT * FROM unnest(
+      ${ids}::bigint[], ${oFromUsers}::bigint[], ${levels}::int[],
+      ${oZeros}::float8[], ${amts}::float8[], ${oZeros}::float8[])`
+
+  // Activity-feed notification for each earner.
+  const oTypes = ids.map(() => 'Referral income')
+  const oIcons = ids.map(() => '🪙')
+  const oTitles = ids.map(() => 'Referral income')
+  const oSubs = levels.map((l) => `Level ${l} · daily override on a referral's staking`)
+  const oAmtStrs = amts.map((a) => `+${fmt(a, 4)} $MOOLA`)
+  const oPoss = ids.map(() => true)
+  await sql`
+    INSERT INTO transactions (user_id, type, icon, title, sub, amt, pos)
+    SELECT * FROM unnest(
+      ${ids}::bigint[], ${oTypes}::text[], ${oIcons}::text[], ${oTitles}::text[],
+      ${oSubs}::text[], ${oAmtStrs}::text[], ${oPoss}::boolean[])`
+}
