@@ -35,12 +35,12 @@ export default function Overlays({ v }: { v: MoolaVals }) {
               </div>
               <div style={css('display:flex;align-items:center;gap:11px;padding:12px 13px;border-radius:13px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.16)')}>
                 <div style={css('width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#26a17b,#2fd6a6);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff')}>₮</div>
-                <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>{v.usdtBalStr} USDT</div><div style={css('font-size:11.5px;color:#92b8a3')}>Solana (SPL) · buy presale</div></div>
+                <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>{v.usdtBalStr} USDT</div><div style={css('font-size:11.5px;color:#92b8a3')}>Solana · buy presale</div></div>
                 <div onClick={() => v.openDeposit('USDT')} style={css('padding:7px 16px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Deposit</div>
               </div>
               <div style={css('display:flex;align-items:center;gap:11px;padding:12px 13px;border-radius:13px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.16)')}>
                 <div style={css('width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#2775ca,#3b9bff);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff')}>$</div>
-                <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>{v.usdcBalStr} USDC</div><div style={css('font-size:11.5px;color:#92b8a3')}>Solana (SPL) · buy presale</div></div>
+                <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>{v.usdcBalStr} USDC</div><div style={css('font-size:11.5px;color:#92b8a3')}>Solana · buy presale</div></div>
                 <div onClick={() => v.openDeposit('USDC')} style={css('padding:7px 16px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Deposit</div>
               </div>
             </div>
@@ -51,10 +51,10 @@ export default function Overlays({ v }: { v: MoolaVals }) {
             </div>
             <div onClick={v.openWithdraw} style={css('text-align:center;padding:13px;border-radius:14px;border:1px solid rgba(110,200,150,.3);color:#9fefc6;font-weight:700;cursor:pointer;margin-bottom:18px')}>🏧 Withdraw to wallet</div>
             <div style={css('font-size:13px;color:#92b8a3;margin-bottom:9px')}>Deposit network</div>
-            <div style={css('display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:13px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.16)')}>
+            <div onClick={() => v.openDeposit('SOL')} style={css('display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:13px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.16);cursor:pointer')}>
               <div style={css('width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#9945ff,#14f195);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff')}>◎</div>
-              <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>Solana (SPL)</div><div style={css('font-size:11.5px;color:#92b8a3')}>So1a…MooLa9aE2 · tap to copy</div></div>
-              <div onClick={v.copyRef} style={css('padding:7px 14px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Copy</div>
+              <div style={css('flex:1')}><div style={css('font-weight:700;font-size:14px')}>Solana</div><div style={css('font-size:11.5px;color:#92b8a3')}>Your deposit address · tap to deposit</div></div>
+              <div onClick={() => v.openDeposit('SOL')} style={css('padding:7px 14px;border-radius:14px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12px;cursor:pointer')}>Deposit</div>
             </div>
             <div style={css('font-size:13px;color:#92b8a3;margin:18px 0 9px')}>Recent activity</div>
             <div style={css('text-align:center;padding:18px 0;border-top:1px solid rgba(110,200,150,.1);font-size:13px;color:#7ea98f')}>No activity yet — claim your airdrop to get started.</div>
