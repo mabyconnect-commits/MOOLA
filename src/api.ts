@@ -197,7 +197,10 @@ export const api = {
     withdrawals: (status?: string) =>
       request<{ withdrawals: AdminWithdrawal[] }>('/admin/withdrawals' + (status ? '?status=' + status : ''), 'GET'),
     resolve: (id: number) => request<{ resolved: string }>('/admin/resolve-withdrawal', 'POST', { id }),
-    sweepAll: () => request<{ checked: number; swept: number }>('/admin/sweep-all', 'POST', {}),
+    sweepAll: (batch?: number) =>
+      request<{ attempted: number; swept: number; stuck: number; remaining: number }>('/admin/sweep-all', 'POST', batch ? { batch } : {}),
+    depositScan: () =>
+      request<{ stuck: { n: number; sol: number; usdt: number; usdc: number } }>('/admin/deposit-scan', 'GET'),
     users: (q?: string) =>
       request<{ users: AdminUser[] }>('/admin/users' + (q ? '?q=' + encodeURIComponent(q) : ''), 'GET'),
     depositLookup: (q: string) =>

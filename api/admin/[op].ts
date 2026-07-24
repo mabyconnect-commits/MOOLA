@@ -90,29 +90,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ resolved: 'still-unknown' })
       }
 
+      // ---- SCAN: how much is sitting unswept in deposit wallets ----------
+      // DB-only (no RPC): dep_* holds the last-seen on-chain leftover after a
+      // deposit-check, so dep_* > 0 flags wallets whose sweep didn't complete.
+      case 'deposit-scan': {
+        const r = await sql<{ n: number; sol: number; usdt: number; usdc: number }>`
+          SELECT count(*)::int AS n,
+                 COALESCE(sum(dep_sol),0) AS sol, COALESCE(sum(dep_usdt),0) AS usdt, COALESCE(sum(dep_usdc),0) AS usdc
+          FROM accounts WHERE dep_sol > 0.0001 OR dep_usdt > 0 OR dep_usdc > 0`
+        return res.status(200).json({ stuck: r.rows[0] })
+      }
+
       // ---- SWEEP ALL deposit addresses that hold funds -------------------
+      // Only wallets with recorded funds (dep_* > 0) are processed, and each
+      // is re-read + dep_* is rewritten after sweeping — so a successful sweep
+      // drops the wallet off the candidate set and repeated calls drain the
+      // whole backlog (the frontend loops until `remaining` hits 0). Small
+      // batch keeps each call within the function timeout.
       case 'sweep-all': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
         const solana = await import('../_lib/solana.js')
         if (!solana.sweepConfigured()) return res.status(503).json({ error: 'Sweep not configured.' })
-        // Cap per call to stay within the function timeout; admin can re-run.
-        const users = await sql<{ deposit_index: number }>`
-          SELECT deposit_index FROM users WHERE deposit_index IS NOT NULL ORDER BY deposit_index LIMIT 20`
-        let checked = 0
+        const batch = Math.min(Math.max(Number(body.batch) || 5, 1), 10)
+        const cands = await sql<{ user_id: number; deposit_index: number }>`
+          SELECT u.id AS user_id, u.deposit_index
+          FROM users u JOIN accounts a ON a.user_id = u.id
+          WHERE u.deposit_index IS NOT NULL
+            AND (a.dep_sol > 0.0001 OR a.dep_usdt > 0 OR a.dep_usdc > 0)
+          ORDER BY u.deposit_index LIMIT ${batch}`
+
+        let attempted = 0
         let swept = 0
-        for (const u of users.rows) {
-          checked++
+        let stuck = 0
+        for (const c of cands.rows) {
+          attempted++
           try {
-            const b = await solana.readBalances(u.deposit_index)
-            if (b.sol > 0.0001 || b.usdt > 0 || b.usdc > 0) {
-              await solana.sweepToTreasury(u.deposit_index)
-              swept++
+            const before = await solana.readBalances(c.deposit_index)
+            if (before.sol > 0.0001 || before.usdt > 0 || before.usdc > 0) {
+              await solana.sweepToTreasury(c.deposit_index)
             }
+            // Re-read and rewrite dep_* so a cleared wallet leaves the set (and
+            // a stale record for already-empty wallets is corrected to 0).
+            const after = await solana.readBalances(c.deposit_index)
+            await sql`UPDATE accounts SET dep_sol = ${after.sol}, dep_usdt = ${after.usdt}, dep_usdc = ${after.usdc} WHERE user_id = ${c.user_id}`
+            if (after.sol <= 0.0001 && after.usdt <= 0 && after.usdc <= 0) swept++
+            else stuck++
           } catch (e) {
-            console.error('[moola] admin sweep-all failed for index', u.deposit_index, e)
+            stuck++
+            console.error('[moola] admin sweep-all failed for index', c.deposit_index, e)
           }
         }
-        return res.status(200).json({ checked, swept })
+        const rem = await sql<{ n: number }>`
+          SELECT count(*)::int AS n FROM accounts WHERE dep_sol > 0.0001 OR dep_usdt > 0 OR dep_usdc > 0`
+        return res.status(200).json({ attempted, swept, stuck, remaining: rem.rows[0].n })
       }
 
       // ---- DEPOSIT LOOKUP: where are a user's funds? ---------------------

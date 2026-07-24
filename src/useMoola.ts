@@ -100,6 +100,8 @@ interface MoolaState {
   adminBusy: boolean
   adminDepQuery: string
   adminDepResult: DepositLookup | null
+  adminStuck: { n: number; sol: number; usdt: number; usdc: number } | null
+  adminSweepMsg: string
 }
 
 // Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
@@ -183,6 +185,8 @@ const initialState: MoolaState = {
   adminBusy: false,
   adminDepQuery: '',
   adminDepResult: null,
+  adminStuck: null,
+  adminSweepMsg: '',
 }
 
 function fmt(n: number, d: number): string {
@@ -749,8 +753,8 @@ export function useMoola() {
   const adminLoad = async () => {
     set({ adminBusy: true })
     try {
-      const [ov, wd] = await Promise.all([api.admin.overview(), api.admin.withdrawals()])
-      set({ adminOverview: ov, adminWithdrawals: wd.withdrawals })
+      const [ov, wd, sc] = await Promise.all([api.admin.overview(), api.admin.withdrawals(), api.admin.depositScan()])
+      set({ adminOverview: ov, adminWithdrawals: wd.withdrawals, adminStuck: sc.stuck })
     } catch (e) {
       flash(errMsg(e))
     } finally {
@@ -771,14 +775,42 @@ export function useMoola() {
       flash(errMsg(e))
     }
   }
+  // Scan for funds sitting unswept in deposit wallets (fast, DB-only).
+  const adminScan = async () => {
+    try {
+      const r = await api.admin.depositScan()
+      set({ adminStuck: r.stuck })
+    } catch (e) {
+      flash(errMsg(e))
+    }
+  }
+  // Sweep ALL stuck deposit wallets by looping small batches until the backlog
+  // is drained (remaining === 0) or a batch makes no progress (funds that can't
+  // be swept — usually the treasury needs SOL for gas).
   const adminSweepAll = async () => {
     if (stateRef.current.adminBusy) return
-    set({ adminBusy: true })
+    set({ adminBusy: true, adminSweepMsg: 'Starting…' })
+    let totalSwept = 0
     try {
-      const r = await api.admin.sweepAll()
-      flash(`Swept ${r.swept} of ${r.checked} checked`)
+      for (let i = 0; i < 500; i++) {
+        const r = await api.admin.sweepAll()
+        totalSwept += r.swept
+        set({ adminSweepMsg: `Swept ${totalSwept} so far · ${r.remaining} left…` })
+        if (r.remaining <= 0) {
+          set({ adminSweepMsg: '' })
+          flash(`✅ Done — swept ${totalSwept} wallet${totalSwept === 1 ? '' : 's'}. All clear.`)
+          break
+        }
+        if (r.swept === 0) {
+          set({ adminSweepMsg: '' })
+          flash(`Swept ${totalSwept}. ${r.remaining} couldn't be swept — treasury likely needs SOL for gas.`)
+          break
+        }
+      }
+      await adminScan()
       await adminLoad()
     } catch (e) {
+      set({ adminSweepMsg: '' })
       flash(errMsg(e))
     } finally {
       set({ adminBusy: false })
@@ -852,6 +884,9 @@ export function useMoola() {
     onAdminDepQuery: onInput('adminDepQuery'),
     adminDepLookup,
     adminDepReconcile,
+    adminStuck: s.adminStuck,
+    adminSweepMsg: s.adminSweepMsg,
+    adminScan,
     openAdmin,
     adminRefresh: adminLoad,
     adminResolve,

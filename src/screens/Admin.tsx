@@ -23,6 +23,7 @@ function Wallet({ label, address, bal }: { label: string; address: string; bal: 
 export default function Admin({ v }: { v: MoolaVals }) {
   const o = v.adminOverview
   const dep = v.adminDepResult
+  const stuck = v.adminStuck
   const pending = v.adminWithdrawals.filter((w) => w.status === 'pending')
   return (
     <div style={css('position:relative;padding:18px 16px 120px')}>
@@ -68,8 +69,26 @@ export default function Admin({ v }: { v: MoolaVals }) {
         </div>
       )}
 
-      {/* Sweep all */}
-      <div onClick={v.adminSweepAll} style={css('text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:18px;' + (v.adminBusy ? 'opacity:.6;pointer-events:none' : ''))}>{v.adminBusy ? 'Working…' : '🧹 Sweep all deposit wallets'}</div>
+      {/* Stuck deposits (funds sitting in deposit wallets, not yet swept) */}
+      <div style={css('border-radius:14px;background:rgba(242,179,78,.1);border:1px solid rgba(242,179,78,.28);padding:14px;margin-bottom:12px')}>
+        <div style={css('display:flex;align-items:center;justify-content:space-between;margin-bottom:6px')}>
+          <span style={css('font-size:13px;color:#f2b34e;font-weight:700')}>💰 Unswept in deposit wallets</span>
+          <div onClick={v.adminScan} style={css('font-size:12px;color:#7ea98f;cursor:pointer')}>↻ Scan</div>
+        </div>
+        {stuck ? (
+          <div style={css('font-size:14px;font-weight:700;line-height:1.6')}>
+            ◎ {n(stuck.sol, 4)} SOL · ₮ {n(stuck.usdt)} USDT · $ {n(stuck.usdc)} USDC
+            <div style={css('font-size:11.5px;color:#92b8a3;font-weight:400')}>across {stuck.n} wallet{stuck.n === 1 ? '' : 's'} · sweep to move it to treasury + payout</div>
+          </div>
+        ) : (
+          <div style={css('font-size:12.5px;color:#7ea98f')}>Tap Scan to check.</div>
+        )}
+      </div>
+
+      {/* Sweep all — loops batches until every stuck wallet is drained */}
+      <div onClick={v.adminSweepAll} style={css('text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#23d39a,#1bbd84);color:#06160e;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:6px;' + (v.adminBusy ? 'opacity:.6;pointer-events:none' : ''))}>{v.adminBusy ? 'Sweeping…' : '🧹 Sweep all deposit wallets'}</div>
+      {v.adminSweepMsg && <div style={css('text-align:center;font-size:12px;color:#7ea98f;margin-bottom:18px')}>{v.adminSweepMsg}</div>}
+      {!v.adminSweepMsg && <div style={css('margin-bottom:18px')}></div>}
 
       {/* Deposit lookup & reconcile — "I deposited but it didn't reflect" */}
       <div style={css('border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);padding:14px;margin-bottom:18px')}>
