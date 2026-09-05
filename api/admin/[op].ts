@@ -126,20 +126,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         })
       }
 
-      // ---- WITHDRAWAL ELIGIBILITY for one user ---------------------------
-      // "Do they actually have funds to withdraw?" — the full breakdown behind
-      // the guard (deposits, investor commission, own-stake rewards, already
-      // withdrawn, and what's left) for the user matching ?q=email-or-id.
+      // ---- WITHDRAWERS: everyone who has withdrawn, most active first ----
+      // One row per user with how MANY times they've withdrawn, the total value,
+      // how many distinct wallets they paid, and whether it's deposit-backed —
+      // so a user cashing out over and over (like the "2nTD…" pattern) is
+      // obvious at the top of the list. Tap one to load full details.
+      case 'withdrawers': {
+        const rows = await sql`
+          SELECT u.id, u.email, u.created_at,
+                 COALESCE(a.deposited_usd, 0) AS deposited_usd,
+                 COUNT(w.id)::int AS payouts,
+                 COUNT(DISTINCT w.address)::int AS addresses,
+                 COALESCE(SUM(CASE WHEN w.asset = 'SOL' THEN w.amount * ${SOL_PRICE} ELSE w.amount END), 0) AS withdrawn_usd,
+                 MIN(w.created_at) AS first_at,
+                 MAX(w.created_at) AS last_at
+          FROM users u
+          JOIN withdrawals w ON w.user_id = u.id AND w.status IN ('pending', 'sent')
+          LEFT JOIN accounts a ON a.user_id = u.id
+          GROUP BY u.id, u.email, u.created_at, a.deposited_usd
+          ORDER BY payouts DESC, withdrawn_usd DESC
+          LIMIT 100`
+        return res.status(200).json({ withdrawers: rows.rows })
+      }
+
+      // ---- WITHDRAWAL DETAILS for one user ------------------------------
+      // "See all their details": the full eligibility breakdown behind the guard
+      // (deposits, investor commission, own-stake rewards, already withdrawn,
+      // what's left), current balances, and every one of their withdrawals.
+      // Matches ?q=email-or-id.
       case 'withdraw-check': {
         const q = String((req.query.q as string) || '').trim()
         if (!q) return res.status(400).json({ error: 'Pass ?q=email or user id' })
         const found = /^\d+$/.test(q)
-          ? await sql<{ id: number; email: string }>`SELECT id, email FROM users WHERE id = ${Number(q)} LIMIT 1`
-          : await sql<{ id: number; email: string }>`SELECT id, email FROM users WHERE email ILIKE ${q} ORDER BY created_at DESC LIMIT 1`
+          ? await sql<{ id: number; email: string; created_at: string; deposit_index: number | null }>`
+              SELECT id, email, created_at, deposit_index FROM users WHERE id = ${Number(q)} LIMIT 1`
+          : await sql<{ id: number; email: string; created_at: string; deposit_index: number | null }>`
+              SELECT id, email, created_at, deposit_index FROM users WHERE email ILIKE ${q} ORDER BY created_at DESC LIMIT 1`
         const u = found.rows[0]
         if (!u) return res.status(404).json({ error: 'No user matches that email/id' })
+
         const assess = await assessWithdrawable(u.id)
-        return res.status(200).json({ user: { id: u.id, email: u.email }, assessment: assess })
+        const bal = await sql<{ balance: number; staked: number; available: number; sol: number; usdt: number; usdc: number; deposited_usd: number }>`
+          SELECT COALESCE(balance,0) AS balance, COALESCE(staked,0) AS staked, COALESCE(available,0) AS available,
+                 COALESCE(sol,0) AS sol, COALESCE(usdt,0) AS usdt, COALESCE(usdc,0) AS usdc,
+                 COALESCE(deposited_usd,0) AS deposited_usd
+          FROM accounts WHERE user_id = ${u.id}`
+        const wds = await sql`
+          SELECT id, asset, amount, address, status, signature, created_at
+          FROM withdrawals WHERE user_id = ${u.id} ORDER BY created_at DESC LIMIT 100`
+        return res.status(200).json({
+          user: { id: u.id, email: u.email, createdAt: u.created_at, depositIndex: u.deposit_index },
+          assessment: assess,
+          balances: bal.rows[0] || null,
+          withdrawals: wds.rows,
+        })
       }
 
       // ---- RESOLVE A PENDING WITHDRAWAL ----------------------------------

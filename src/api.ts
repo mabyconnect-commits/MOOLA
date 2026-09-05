@@ -159,6 +159,40 @@ export interface WithdrawAssessment {
   remainingUsd: number
   eligible: boolean
 }
+export interface AdminWithdrawer {
+  id: number
+  email: string
+  created_at: string
+  deposited_usd: number
+  payouts: number
+  addresses: number
+  withdrawn_usd: number
+  first_at: string
+  last_at: string
+}
+export interface WithdrawalRow {
+  id: number
+  asset: string
+  amount: number
+  address: string
+  status: string
+  signature: string | null
+  created_at: string
+}
+export interface WithdrawDetail {
+  user: { id: number; email: string; createdAt: string; depositIndex: number | null }
+  assessment: WithdrawAssessment
+  balances: {
+    balance: number
+    staked: number
+    available: number
+    sol: number
+    usdt: number
+    usdc: number
+    deposited_usd: number
+  } | null
+  withdrawals: WithdrawalRow[]
+}
 
 export interface DepositLookup {
   user: { id: number; email: string; depositIndex: number | null }
@@ -242,10 +276,8 @@ export const api = {
         { id },
       ),
     abuseReport: () => request<AbuseReport>('/admin/abuse-report', 'GET'),
+    withdrawers: () => request<{ withdrawers: AdminWithdrawer[] }>('/admin/withdrawers', 'GET'),
     withdrawCheck: (q: string) =>
-      request<{ user: { id: number; email: string }; assessment: WithdrawAssessment }>(
-        '/admin/withdraw-check?q=' + encodeURIComponent(q),
-        'GET',
-      ),
+      request<WithdrawDetail>('/admin/withdraw-check?q=' + encodeURIComponent(q), 'GET'),
   },
 }

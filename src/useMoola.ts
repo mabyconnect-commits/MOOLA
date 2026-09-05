@@ -15,6 +15,8 @@ import {
   type AdminUser,
   type DepositLookup,
   type AbuseReport,
+  type AdminWithdrawer,
+  type WithdrawDetail,
 } from './api'
 
 export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me' | 'admin'
@@ -103,6 +105,8 @@ interface MoolaState {
   adminDepQuery: string
   adminDepResult: DepositLookup | null
   adminAbuse: AbuseReport | null
+  adminWithdrawers: AdminWithdrawer[]
+  adminUserDetail: WithdrawDetail | null
 }
 
 // Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
@@ -188,6 +192,8 @@ const initialState: MoolaState = {
   adminDepQuery: '',
   adminDepResult: null,
   adminAbuse: null,
+  adminWithdrawers: [],
+  adminUserDetail: null,
 }
 
 function fmt(n: number, d: number): string {
@@ -755,12 +761,13 @@ export function useMoola() {
   const adminLoad = async () => {
     set({ adminBusy: true })
     try {
-      const [ov, wd, ab] = await Promise.all([
+      const [ov, wd, ab, wr] = await Promise.all([
         api.admin.overview(),
         api.admin.withdrawals(),
         api.admin.abuseReport(),
+        api.admin.withdrawers(),
       ])
-      set({ adminOverview: ov, adminWithdrawals: wd.withdrawals, adminAbuse: ab })
+      set({ adminOverview: ov, adminWithdrawals: wd.withdrawals, adminAbuse: ab, adminWithdrawers: wr.withdrawers })
     } catch (e) {
       flash(errMsg(e))
     } finally {
@@ -802,6 +809,21 @@ export function useMoola() {
       flash(errMsg(e))
     }
   }
+  // Full details for one withdrawer (eligibility breakdown, balances, every
+  // payout). `q` is an email or user id (a row tap passes the id).
+  const adminUserDetail = async (q: string) => {
+    if (!q) return
+    set({ adminBusy: true })
+    try {
+      const r = await api.admin.withdrawCheck(q)
+      set({ adminUserDetail: r })
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ adminBusy: false })
+    }
+  }
+  const adminCloseDetail = () => set({ adminUserDetail: null })
   // Deposit investigation: look up a user's on-chain deposit address + balances.
   const adminDepLookup = async () => {
     const q = stateRef.current.adminDepQuery.trim()
@@ -860,9 +882,13 @@ export function useMoola() {
     adminDepQuery: s.adminDepQuery,
     adminDepResult: s.adminDepResult,
     adminAbuse: s.adminAbuse,
+    adminWithdrawers: s.adminWithdrawers,
+    adminUserDetail: s.adminUserDetail,
     onAdminDepQuery: onInput('adminDepQuery'),
     adminDepLookup,
     adminDepReconcile,
+    adminUserDetailLoad: adminUserDetail,
+    adminCloseDetail,
     openAdmin,
     adminRefresh: adminLoad,
     adminResolve,
