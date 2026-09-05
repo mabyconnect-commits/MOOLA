@@ -1,7 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ensureSchema, getDepCredited, getDepositIndex, sql } from '../_lib/db.js'
 import { requireAdmin } from '../_lib/admin.js'
-import { addTxn, fmt, loadAccount, saveAccount } from '../_lib/economics.js'
+import {
+  addTxn,
+  fmt,
+  loadAccount,
+  saveAccount,
+  assessWithdrawable,
+  creditDepositedUsd,
+  SOL_PRICE,
+} from '../_lib/economics.js'
 
 // All admin operations live behind requireAdmin (server-side allowlist check).
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -49,16 +57,89 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // ---- WITHDRAWALS LIST ---------------------------------------------
+      // Each row carries the user's cumulative real deposits so an admin can see
+      // at a glance whether a payout is backed by real money (`deposited_usd`)
+      // or is a free-airdrop cash-out (`deposited_usd` = 0).
       case 'withdrawals': {
         const status = String((req.query.status as string) || '').trim()
         const rows = status
-          ? await sql`SELECT w.id, w.user_id, u.email, w.asset, w.amount, w.address, w.status, w.signature, w.created_at
+          ? await sql`SELECT w.id, w.user_id, u.email, w.asset, w.amount, w.address, w.status, w.signature, w.created_at,
+                             COALESCE(a.deposited_usd, 0) AS deposited_usd
                       FROM withdrawals w LEFT JOIN users u ON u.id = w.user_id
+                      LEFT JOIN accounts a ON a.user_id = w.user_id
                       WHERE w.status = ${status} ORDER BY w.created_at DESC LIMIT 100`
-          : await sql`SELECT w.id, w.user_id, u.email, w.asset, w.amount, w.address, w.status, w.signature, w.created_at
+          : await sql`SELECT w.id, w.user_id, u.email, w.asset, w.amount, w.address, w.status, w.signature, w.created_at,
+                             COALESCE(a.deposited_usd, 0) AS deposited_usd
                       FROM withdrawals w LEFT JOIN users u ON u.id = w.user_id
+                      LEFT JOIN accounts a ON a.user_id = w.user_id
                       ORDER BY w.created_at DESC LIMIT 100`
         return res.status(200).json({ withdrawals: rows.rows })
+      }
+
+      // ---- ABUSE REPORT: find the withdrawal loop ------------------------
+      // Three signals that catch the "farm free tokens → cash out" pattern:
+      //   rings   — one destination wallet paid by MANY accounts (a farm ring,
+      //             e.g. the "CBLq…" address hit over and over in the report)
+      //   farmers — accounts that withdrew real crypto but NEVER deposited
+      //   totals  — real money in (deposits) vs real money out (payouts)
+      case 'abuse-report': {
+        const rings = await sql`
+          SELECT w.address,
+                 COUNT(*)::int AS payouts,
+                 COUNT(DISTINCT w.user_id)::int AS users,
+                 COALESCE(SUM(CASE WHEN w.asset = 'SOL' THEN w.amount * ${SOL_PRICE} ELSE w.amount END), 0) AS usd,
+                 MAX(w.created_at) AS last_at
+          FROM withdrawals w
+          WHERE w.status IN ('pending', 'sent')
+          GROUP BY w.address
+          HAVING COUNT(*) > 1
+          ORDER BY COUNT(DISTINCT w.user_id) DESC, COUNT(*) DESC
+          LIMIT 40`
+
+        const farmers = await sql`
+          SELECT u.id, u.email, u.created_at,
+                 COALESCE(a.deposited_usd, 0) AS deposited_usd,
+                 COUNT(w.id)::int AS payouts,
+                 COALESCE(SUM(CASE WHEN w.asset = 'SOL' THEN w.amount * ${SOL_PRICE} ELSE w.amount END), 0) AS withdrawn_usd
+          FROM users u
+          JOIN withdrawals w ON w.user_id = u.id AND w.status IN ('pending', 'sent')
+          LEFT JOIN accounts a ON a.user_id = u.id
+          GROUP BY u.id, u.email, u.created_at, a.deposited_usd
+          HAVING COALESCE(a.deposited_usd, 0) = 0
+          ORDER BY withdrawn_usd DESC
+          LIMIT 50`
+
+        const totals = await sql<{ deposited: number }>`SELECT COALESCE(SUM(deposited_usd), 0) AS deposited FROM accounts`
+        const paid = await sql<{ paid: number; n: number }>`
+          SELECT COALESCE(SUM(CASE WHEN asset = 'SOL' THEN amount * ${SOL_PRICE} ELSE amount END), 0) AS paid,
+                 COUNT(*)::int AS n
+          FROM withdrawals WHERE status IN ('pending', 'sent')`
+
+        return res.status(200).json({
+          rings: rings.rows,
+          farmers: farmers.rows,
+          totals: {
+            depositedUsd: Number(totals.rows[0]?.deposited || 0),
+            paidUsd: Number(paid.rows[0]?.paid || 0),
+            payouts: Number(paid.rows[0]?.n || 0),
+          },
+        })
+      }
+
+      // ---- WITHDRAWAL ELIGIBILITY for one user ---------------------------
+      // "Do they actually have funds to withdraw?" — the full breakdown behind
+      // the guard (deposits, investor commission, own-stake rewards, already
+      // withdrawn, and what's left) for the user matching ?q=email-or-id.
+      case 'withdraw-check': {
+        const q = String((req.query.q as string) || '').trim()
+        if (!q) return res.status(400).json({ error: 'Pass ?q=email or user id' })
+        const found = /^\d+$/.test(q)
+          ? await sql<{ id: number; email: string }>`SELECT id, email FROM users WHERE id = ${Number(q)} LIMIT 1`
+          : await sql<{ id: number; email: string }>`SELECT id, email FROM users WHERE email ILIKE ${q} ORDER BY created_at DESC LIMIT 1`
+        const u = found.rows[0]
+        if (!u) return res.status(404).json({ error: 'No user matches that email/id' })
+        const assess = await assessWithdrawable(u.id)
+        return res.status(200).json({ user: { id: u.id, email: u.email }, assessment: assess })
       }
 
       // ---- RESOLVE A PENDING WITHDRAWAL ----------------------------------
@@ -204,6 +285,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             a.usdt += newUsdt
             a.usdc += newUsdc
             await saveAccount(id, a)
+            await creditDepositedUsd(id, newSol * SOL_PRICE + newUsdt + newUsdc)
             if (newSol > 0) await addTxn(id, { icon: '⬇️', title: 'SOL deposit', sub: 'Solana (admin reconcile)', amt: `+${fmt(newSol, 4)} SOL`, pos: true })
             if (newUsdt > 0) await addTxn(id, { icon: '⬇️', title: 'USDT deposit', sub: 'Solana SPL (admin reconcile)', amt: `+${fmt(newUsdt, 2)} USDT`, pos: true })
             if (newUsdc > 0) await addTxn(id, { icon: '⬇️', title: 'USDC deposit', sub: 'Solana SPL (admin reconcile)', amt: `+${fmt(newUsdc, 2)} USDC`, pos: true })
@@ -243,10 +325,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'users': {
         const q = String((req.query.q as string) || '').trim()
         const rows = q
-          ? await sql`SELECT u.id, u.email, u.created_at, u.deposit_index, a.balance, a.staked, a.available, a.sol, a.usdt, a.usdc
+          ? await sql`SELECT u.id, u.email, u.created_at, u.deposit_index, a.balance, a.staked, a.available, a.sol, a.usdt, a.usdc, COALESCE(a.deposited_usd,0) AS deposited_usd
                       FROM users u LEFT JOIN accounts a ON a.user_id = u.id
                       WHERE u.email ILIKE ${'%' + q + '%'} ORDER BY u.created_at DESC LIMIT 50`
-          : await sql`SELECT u.id, u.email, u.created_at, u.deposit_index, a.balance, a.staked, a.available, a.sol, a.usdt, a.usdc
+          : await sql`SELECT u.id, u.email, u.created_at, u.deposit_index, a.balance, a.staked, a.available, a.sol, a.usdt, a.usdc, COALESCE(a.deposited_usd,0) AS deposited_usd
                       FROM users u LEFT JOIN accounts a ON a.user_id = u.id
                       ORDER BY u.created_at DESC LIMIT 50`
         return res.status(200).json({ users: rows.rows })

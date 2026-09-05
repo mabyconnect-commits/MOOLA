@@ -14,6 +14,7 @@ import {
   type AdminWithdrawal,
   type AdminUser,
   type DepositLookup,
+  type AbuseReport,
 } from './api'
 
 export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me' | 'admin'
@@ -85,6 +86,7 @@ interface MoolaState {
   demoCode: string
   showPw: boolean
   joinedTg: boolean
+  joinedX: boolean
   txns: ApiTxn[]
   refCode: string
   refInput: string
@@ -100,6 +102,7 @@ interface MoolaState {
   adminBusy: boolean
   adminDepQuery: string
   adminDepResult: DepositLookup | null
+  adminAbuse: AbuseReport | null
 }
 
 // Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
@@ -168,6 +171,7 @@ const initialState: MoolaState = {
   demoCode: '',
   showPw: false,
   joinedTg: false,
+  joinedX: false,
   txns: [],
   refCode: '',
   refInput: '',
@@ -183,6 +187,7 @@ const initialState: MoolaState = {
   adminBusy: false,
   adminDepQuery: '',
   adminDepResult: null,
+  adminAbuse: null,
 }
 
 function fmt(n: number, d: number): string {
@@ -247,8 +252,9 @@ export function useMoola() {
       // If we already hold a session token, boot straight into a loading state
       // and hydrate from the server rather than flashing the welcome screen.
       booting: hasSession,
-      // Remember whether the user already joined Telegram (gates the claim).
+      // Remember whether the user already did the social tasks (gate the claim).
       joinedTg: typeof window !== 'undefined' && localStorage.getItem('moola_tg') === '1',
+      joinedX: typeof window !== 'undefined' && localStorage.getItem('moola_x') === '1',
       // A referral link should drop the visitor on signup with the code filled.
       refInput: incomingRef,
       authView: !hasSession && incomingRef ? 'signup' : initialState.authView,
@@ -749,8 +755,12 @@ export function useMoola() {
   const adminLoad = async () => {
     set({ adminBusy: true })
     try {
-      const [ov, wd] = await Promise.all([api.admin.overview(), api.admin.withdrawals()])
-      set({ adminOverview: ov, adminWithdrawals: wd.withdrawals })
+      const [ov, wd, ab] = await Promise.all([
+        api.admin.overview(),
+        api.admin.withdrawals(),
+        api.admin.abuseReport(),
+      ])
+      set({ adminOverview: ov, adminWithdrawals: wd.withdrawals, adminAbuse: ab })
     } catch (e) {
       flash(errMsg(e))
     } finally {
@@ -849,6 +859,7 @@ export function useMoola() {
     adminBusy: s.adminBusy,
     adminDepQuery: s.adminDepQuery,
     adminDepResult: s.adminDepResult,
+    adminAbuse: s.adminAbuse,
     onAdminDepQuery: onInput('adminDepQuery'),
     adminDepLookup,
     adminDepReconcile,
@@ -1069,6 +1080,9 @@ export function useMoola() {
     copyRef,
     toastSoon: () => flash('Coming soon ✨'),
     joinedTg: s.joinedTg,
+    joinedX: s.joinedX,
+    // Both social tasks must be done before the airdrop can be claimed.
+    tasksDone: s.joinedTg && s.joinedX,
     joinTelegram: () => {
       try {
         window.open('https://t.me/MoolaAirdrop', '_blank')
@@ -1082,6 +1096,20 @@ export function useMoola() {
       }
       set({ joinedTg: true })
       flash('Opening Telegram…')
+    },
+    followX: () => {
+      try {
+        window.open('https://x.com/MoolaAirdrop', '_blank')
+      } catch {
+        /* ignore */
+      }
+      try {
+        localStorage.setItem('moola_x', '1')
+      } catch {
+        /* ignore */
+      }
+      set({ joinedX: true })
+      flash('Opening X (Twitter)…')
     },
     // history / settings
     history: s.history,

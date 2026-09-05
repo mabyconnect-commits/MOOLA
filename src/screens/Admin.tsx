@@ -100,6 +100,52 @@ export default function Admin({ v }: { v: MoolaVals }) {
         )}
       </div>
 
+      {/* Abuse report — the withdrawal loop at a glance */}
+      {v.adminAbuse && (
+        <div style={css('border-radius:14px;background:rgba(40,20,20,.4);border:1px solid rgba(242,120,120,.28);padding:14px;margin-bottom:18px')}>
+          <div style={css('font-size:14px;font-weight:800;margin-bottom:2px;color:#ff9d9d')}>🚨 Abuse report</div>
+          <div style={css('font-size:11.5px;color:#c99;margin-bottom:12px')}>Real money in vs out, and who's draining it.</div>
+
+          {/* money in vs out */}
+          <div style={css('display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px')}>
+            <div style={css('border-radius:11px;background:rgba(8,16,38,.4);padding:11px;text-align:center')}>
+              <div style={css('font-size:11px;color:#92b8a3')}>Deposited (real in)</div>
+              <div style={css('font-size:18px;font-weight:800;color:#23d39a')}>${n(v.adminAbuse.totals.depositedUsd)}</div>
+            </div>
+            <div style={css('border-radius:11px;background:rgba(8,16,38,.4);padding:11px;text-align:center')}>
+              <div style={css('font-size:11px;color:#92b8a3')}>Paid out ({v.adminAbuse.totals.payouts})</div>
+              <div style={css('font-size:18px;font-weight:800;color:' + (v.adminAbuse.totals.paidUsd > v.adminAbuse.totals.depositedUsd ? '#ff8f8f' : '#f2b34e'))}>${n(v.adminAbuse.totals.paidUsd)}</div>
+            </div>
+          </div>
+
+          {/* farm rings — one wallet, many accounts */}
+          <div style={css('font-size:12.5px;font-weight:700;margin-bottom:6px')}>Wallets paid by multiple accounts ({v.adminAbuse.rings.length})</div>
+          {v.adminAbuse.rings.length === 0 && <div style={css('font-size:12px;color:#7ea98f;margin-bottom:10px')}>None detected. 🎉</div>}
+          {v.adminAbuse.rings.map((r) => (
+            <div key={r.address} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px')}>
+              <div style={css('overflow:hidden')}>
+                <div style={css('font-size:12.5px;font-weight:700;font-family:monospace')}>{r.address.slice(0, 6)}…{r.address.slice(-6)}</div>
+                <div style={css('font-size:11px;color:#ff9d9d')}>{r.users} accounts · {r.payouts} payouts</div>
+              </div>
+              <div style={css('font-size:13px;font-weight:800;color:#f2b34e;flex-shrink:0;margin-left:8px')}>${n(r.usd)}</div>
+            </div>
+          ))}
+
+          {/* farmers — withdrew but never deposited */}
+          <div style={css('font-size:12.5px;font-weight:700;margin:12px 0 6px')}>Withdrew with $0 deposited ({v.adminAbuse.farmers.length})</div>
+          {v.adminAbuse.farmers.length === 0 && <div style={css('font-size:12px;color:#7ea98f')}>None. 🎉</div>}
+          {v.adminAbuse.farmers.map((f) => (
+            <div key={f.id} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px')}>
+              <div style={css('overflow:hidden')}>
+                <div style={css('font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{f.email || 'user #' + f.id}</div>
+                <div style={css('font-size:11px;color:#ff9d9d')}>{f.payouts} payouts · 0 deposited</div>
+              </div>
+              <div style={css('font-size:13px;font-weight:800;color:#ff8f8f;flex-shrink:0;margin-left:8px')}>${n(f.withdrawn_usd)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Pending withdrawals to resolve */}
       <div style={css('font-size:15px;font-weight:700;margin-bottom:10px')}>Pending withdrawals ({pending.length})</div>
       {pending.length === 0 && <div style={css('font-size:13px;color:#7ea98f;margin-bottom:18px')}>None pending. 🎉</div>}
@@ -109,6 +155,7 @@ export default function Admin({ v }: { v: MoolaVals }) {
             <div>
               <div style={css('font-size:14px;font-weight:700')}>{n(w.amount, w.asset === 'SOL' ? 4 : 2)} {w.asset}</div>
               <div style={css('font-size:11px;color:#92b8a3')}>{w.email || 'user #' + w.user_id} · {w.address.slice(0, 4)}…{w.address.slice(-4)}</div>
+              <div style={css('font-size:10.5px;font-weight:700;margin-top:2px;color:' + (w.deposited_usd > 0 ? '#23d39a' : '#ff8f8f'))}>{w.deposited_usd > 0 ? '✓ backed · $' + n(w.deposited_usd) + ' deposited' : '⚠ no deposit — free-token cash-out'}</div>
             </div>
             <div onClick={() => v.adminResolve(w.id)} style={css('padding:8px 14px;border-radius:12px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12.5px;cursor:pointer')}>Resolve</div>
           </div>
