@@ -271,11 +271,24 @@ export function assetUsd(asset: 'SOL' | 'USDT' | 'USDC', amount: number): number
   return asset === 'SOL' ? amount * SOL_PRICE : amount
 }
 
+// Only accounts YOUNGER than this many hours may withdraw — a rolling window.
+// Someone who registered in the last 24h can cash out; older accounts (where
+// the abuse sits) are frozen. Set to 0 (or `off`) to disable the age freeze.
+const WITHDRAW_MAX_ACCOUNT_AGE_HOURS = (() => {
+  const raw = (process.env.WITHDRAW_MAX_ACCOUNT_AGE_HOURS || '24').trim().toLowerCase()
+  if (raw === 'off') return 0
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : 0
+})()
+
 /**
  * Resolve the "freeze accounts created before" cutoff as an epoch (ms), or null
- * when freezing is disabled. WITHDRAW_FREEZE_BEFORE wins (an ISO date, or `off`
- * to disable); otherwise the migration-stamped instant is used, so the users
- * that existed when this protection shipped are frozen and new signups are not.
+ * when freezing is disabled. Any account created before this instant is frozen.
+ *
+ * Default: a ROLLING window — now minus WITHDRAW_MAX_ACCOUNT_AGE_HOURS (24h) —
+ * so registrations from the last 24 hours can withdraw and older accounts can't.
+ * WITHDRAW_FREEZE_BEFORE overrides with a FIXED cutoff (an ISO date, or `off` to
+ * disable freezing entirely).
  */
 export async function withdrawFreezeCutoff(): Promise<number | null> {
   const env = (process.env.WITHDRAW_FREEZE_BEFORE || '').trim()
@@ -284,11 +297,8 @@ export async function withdrawFreezeCutoff(): Promise<number | null> {
     const t = Date.parse(env)
     if (!Number.isNaN(t)) return t
   }
-  const { rows } = await sql<{ val: string }>`SELECT val FROM app_meta WHERE key = 'withdraw_freeze_before'`
-  const v = rows[0]?.val
-  if (!v) return null
-  const t = Date.parse(v)
-  return Number.isNaN(t) ? null : t
+  if (WITHDRAW_MAX_ACCOUNT_AGE_HOURS <= 0) return null
+  return Date.now() - WITHDRAW_MAX_ACCOUNT_AGE_HOURS * 3600 * 1000
 }
 
 export interface WithdrawAssessment {

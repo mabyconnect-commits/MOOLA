@@ -189,14 +189,6 @@ export function ensureSchema(): Promise<void> {
       // exactly once (tracked in app_meta), automatically on deploy.
       await sql`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, val TEXT)`
 
-      // ---- Withdrawal freeze cutoff -------------------------------------
-      // Stamp "now" the first time this ships. The withdrawal guard freezes
-      // every account created BEFORE this instant (the existing users, some of
-      // whom are the abusers) while brand-new signups withdraw normally. The
-      // cutoff can be overridden or lifted at runtime with the
-      // WITHDRAW_FREEZE_BEFORE env var (an ISO date, or `off` to disable).
-      await sql`INSERT INTO app_meta (key, val) VALUES ('withdraw_freeze_before', now()::text) ON CONFLICT (key) DO NOTHING`
-
       const reset = await sql<{ key: string }>`SELECT key FROM app_meta WHERE key = 'reset_testdata_v1'`
       if (!reset.rows[0]) {
         await sql`UPDATE accounts SET
