@@ -169,8 +169,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           SELECT COALESCE(SUM(CASE WHEN asset = 'SOL' THEN amount * ${SOL_PRICE} ELSE amount END), 0) AS usd,
                  COUNT(*)::int AS payouts, COUNT(DISTINCT user_id)::int AS accounts
           FROM withdrawals WHERE address = ${address} AND status IN ('pending', 'sent')`
+        const bl = await sql`SELECT 1 FROM blocked_addresses WHERE address = ${address}`
         return res.status(200).json({
           address,
+          blocked: bl.rows.length > 0,
           accounts: accounts.rows,
           totals: {
             usd: Number(tot.rows[0]?.usd || 0),
@@ -178,6 +180,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             accounts: Number(tot.rows[0]?.accounts || 0),
           },
         })
+      }
+
+      // ---- BAN / UNBAN a user (blocks all money actions) -----------------
+      case 'ban-user': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+        const id = Number(body.id)
+        const banned = body.banned !== false // default true
+        if (!id) return res.status(400).json({ error: 'Missing user id' })
+        if (id === adminId && banned) return res.status(400).json({ error: "You can't ban your own admin account." })
+        const r = await sql<{ id: number }>`UPDATE users SET banned = ${banned} WHERE id = ${id} RETURNING id`
+        if (!r.rows.length) return res.status(404).json({ error: 'No such user' })
+        return res.status(200).json({ id, banned })
+      }
+
+      // ---- BLOCK / UNBLOCK a destination wallet -------------------------
+      case 'block-address': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+        const address = String(body.address || '').trim()
+        const blocked = body.blocked !== false // default true
+        if (!address) return res.status(400).json({ error: 'Missing address' })
+        if (blocked) {
+          await sql`INSERT INTO blocked_addresses (address, reason) VALUES (${address}, ${String(body.reason || 'admin')})
+                    ON CONFLICT (address) DO NOTHING`
+        } else {
+          await sql`DELETE FROM blocked_addresses WHERE address = ${address}`
+        }
+        return res.status(200).json({ address, blocked })
+      }
+
+      // ---- ZERO UNBACKED BALANCES ---------------------------------------
+      // Clears in-app SOL/USDT/USDC for accounts with NO real backing (no
+      // deposit AND no commission from a downline who deposited). GET returns a
+      // preview count; POST performs the wipe. Touches app numbers only — never
+      // real on-chain funds.
+      case 'zero-unbacked': {
+        // Accounts that are unbacked (same test as the withdrawal guard) AND
+        // still hold a non-zero in-app crypto balance.
+        const targetSql = sql<{ n: number }>`
+          SELECT COUNT(*)::int AS n FROM accounts a
+          WHERE (a.sol > 0 OR a.usdt > 0 OR a.usdc > 0)
+            AND COALESCE(a.deposited_usd, 0) = 0
+            AND NOT EXISTS (
+              SELECT 1 FROM referral_earnings re
+              JOIN accounts a2 ON a2.user_id = re.from_user
+              WHERE re.beneficiary = a.user_id AND COALESCE(a2.deposited_usd,0) > 0
+            )`
+        if (req.method !== 'POST') {
+          const c = await targetSql
+          return res.status(200).json({ count: Number(c.rows[0]?.n || 0), cleared: false })
+        }
+        const r = await sql<{ user_id: number }>`
+          UPDATE accounts a SET sol = 0, usdt = 0, usdc = 0
+          WHERE (a.sol > 0 OR a.usdt > 0 OR a.usdc > 0)
+            AND COALESCE(a.deposited_usd, 0) = 0
+            AND NOT EXISTS (
+              SELECT 1 FROM referral_earnings re
+              JOIN accounts a2 ON a2.user_id = re.from_user
+              WHERE re.beneficiary = a.user_id AND COALESCE(a2.deposited_usd,0) > 0
+            )
+          RETURNING a.user_id`
+        return res.status(200).json({ count: r.rows.length, cleared: true })
       }
 
       // ---- WITHDRAWERS: everyone who has withdrawn, most active first ----
@@ -212,10 +275,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const q = String((req.query.q as string) || '').trim()
         if (!q) return res.status(400).json({ error: 'Pass ?q=email or user id' })
         const found = /^\d+$/.test(q)
-          ? await sql<{ id: number; email: string; created_at: string; deposit_index: number | null }>`
-              SELECT id, email, created_at, deposit_index FROM users WHERE id = ${Number(q)} LIMIT 1`
-          : await sql<{ id: number; email: string; created_at: string; deposit_index: number | null }>`
-              SELECT id, email, created_at, deposit_index FROM users WHERE email ILIKE ${q} ORDER BY created_at DESC LIMIT 1`
+          ? await sql<{ id: number; email: string; created_at: string; deposit_index: number | null; banned: boolean }>`
+              SELECT id, email, created_at, deposit_index, COALESCE(banned,false) AS banned FROM users WHERE id = ${Number(q)} LIMIT 1`
+          : await sql<{ id: number; email: string; created_at: string; deposit_index: number | null; banned: boolean }>`
+              SELECT id, email, created_at, deposit_index, COALESCE(banned,false) AS banned FROM users WHERE email ILIKE ${q} ORDER BY created_at DESC LIMIT 1`
         const u = found.rows[0]
         if (!u) return res.status(404).json({ error: 'No user matches that email/id' })
 
@@ -247,7 +310,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           FROM referral_earnings WHERE beneficiary = ${u.id}`
 
         return res.status(200).json({
-          user: { id: u.id, email: u.email, createdAt: u.created_at, depositIndex: u.deposit_index },
+          user: { id: u.id, email: u.email, createdAt: u.created_at, depositIndex: u.deposit_index, banned: Boolean(u.banned) },
           assessment: assess,
           balances: bal.rows[0] || null,
           withdrawals: wds.rows,

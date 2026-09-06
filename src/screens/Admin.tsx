@@ -159,6 +159,23 @@ export default function Admin({ v }: { v: MoolaVals }) {
         </div>
       )}
 
+      {/* Zero unbacked balances — clear fake in-app balances of pure farmers */}
+      <div style={css('border-radius:14px;background:rgba(15,40,28,.55);border:1px solid rgba(110,200,150,.16);padding:14px;margin-bottom:18px')}>
+        <div style={css('font-size:14px;font-weight:700;margin-bottom:4px')}>🧯 Zero unbacked balances</div>
+        <div style={css('font-size:11.5px;color:#7ea98f;margin-bottom:10px')}>Clears in-app SOL/USDT/USDC for accounts with $0 deposit and no investing downline. App numbers only — never real crypto.</div>
+        {v.adminZeroCount == null ? (
+          <div onClick={v.adminZeroPreview} style={css('text-align:center;padding:12px;border-radius:11px;border:1px solid rgba(110,200,150,.3);font-size:13.5px;font-weight:700;cursor:pointer;' + (v.adminBusy ? 'opacity:.6;pointer-events:none' : ''))}>Preview how many</div>
+        ) : (
+          <div>
+            <div style={css('text-align:center;font-size:12.5px;color:#ff9d9d;margin-bottom:9px')}>This will clear <b>{v.adminZeroCount}</b> unbacked account{v.adminZeroCount === 1 ? '' : 's'}. This cannot be undone.</div>
+            <div style={css('display:flex;gap:8px')}>
+              <div onClick={v.adminZeroCancel} style={css('flex:1;text-align:center;padding:12px;border-radius:11px;border:1px solid rgba(110,200,150,.25);font-size:13.5px;font-weight:700;cursor:pointer')}>Cancel</div>
+              <div onClick={v.adminZeroRun} style={css('flex:1;text-align:center;padding:12px;border-radius:11px;background:linear-gradient(120deg,#ff8f8f,#e0656a);color:#2a0a0a;font-weight:800;font-size:13.5px;cursor:pointer;' + (v.adminBusy || v.adminZeroCount === 0 ? 'opacity:.6;pointer-events:none' : ''))}>{v.adminBusy ? 'Working…' : 'Confirm clear'}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Withdrawers — everyone cashing out, most active first */}
       <div style={css('display:flex;align-items:center;justify-content:space-between;margin-bottom:10px')}>
         <span style={css('font-size:15px;font-weight:700')}>Withdrawers ({v.adminWithdrawers.length})</span>
@@ -241,6 +258,11 @@ export default function Admin({ v }: { v: MoolaVals }) {
                 <div style={css('font-size:11.5px;color:#bfe3d0')}>CAN STILL WITHDRAW</div>
                 <div style={css('font-size:26px;font-weight:800;color:' + (a.eligible && a.remainingUsd > 0 ? '#23d39a' : '#ff8f8f'))}>${n(a.remainingUsd)}</div>
                 <div style={css('font-size:11.5px;color:#92b8a3')}>{a.eligible ? 'has legitimately-earned value' : '⚠ no real deposit or investor commission'}</div>
+              </div>
+
+              {/* ban / unban */}
+              <div onClick={() => v.adminBanUser(d.user.id, !d.user.banned)} style={css('text-align:center;padding:12px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;margin-bottom:14px;' + (d.user.banned ? 'background:rgba(35,211,154,.16);color:#23d39a;border:1px solid rgba(35,211,154,.4)' : 'background:rgba(242,120,120,.16);color:#ff8f8f;border:1px solid rgba(242,120,120,.45)'))}>
+                {d.user.banned ? '✅ Unban this account' : '🚫 Ban this account'}
               </div>
 
               {/* eligibility breakdown */}
@@ -352,6 +374,11 @@ export default function Admin({ v }: { v: MoolaVals }) {
                   <div style={css('font-size:10.5px;color:#92b8a3')}>Total</div>
                   <div style={css('font-size:17px;font-weight:800;color:#f2b34e')}>${n(w.totals.usd)}</div>
                 </div>
+              </div>
+
+              {/* block / unblock this destination wallet */}
+              <div onClick={() => v.adminBlockAddress(w.address, !w.blocked)} style={css('text-align:center;padding:12px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;margin-bottom:14px;' + (w.blocked ? 'background:rgba(35,211,154,.16);color:#23d39a;border:1px solid rgba(35,211,154,.4)' : 'background:rgba(242,120,120,.16);color:#ff8f8f;border:1px solid rgba(242,120,120,.45)'))}>
+                {w.blocked ? '✅ Unblock this wallet' : '🚫 Block this wallet (no account can pay it)'}
               </div>
 
               <div style={css('font-size:13px;font-weight:700;margin-bottom:8px')}>Accounts that paid this wallet ({w.accounts.length}) <span style={css('color:#7ea98f;font-weight:400')}>· tap</span></div>

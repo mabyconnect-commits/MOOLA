@@ -165,6 +165,7 @@ export interface WalletAccount {
 }
 export interface WalletDetail {
   address: string
+  blocked?: boolean
   accounts: WalletAccount[]
   totals: { usd: number; payouts: number; accounts: number }
 }
@@ -199,7 +200,7 @@ export interface WithdrawalRow {
   created_at: string
 }
 export interface WithdrawDetail {
-  user: { id: number; email: string; createdAt: string; depositIndex: number | null }
+  user: { id: number; email: string; createdAt: string; depositIndex: number | null; banned?: boolean }
   assessment: WithdrawAssessment
   balances: {
     balance: number
@@ -308,5 +309,11 @@ export const api = {
       request<WalletDetail>('/admin/wallet-detail?address=' + encodeURIComponent(address), 'GET'),
     withdrawCheck: (q: string) =>
       request<WithdrawDetail>('/admin/withdraw-check?q=' + encodeURIComponent(q), 'GET'),
+    banUser: (id: number, banned: boolean) =>
+      request<{ id: number; banned: boolean }>('/admin/ban-user', 'POST', { id, banned }),
+    blockAddress: (address: string, blocked: boolean) =>
+      request<{ address: string; blocked: boolean }>('/admin/block-address', 'POST', { address, blocked }),
+    zeroUnbackedPreview: () => request<{ count: number; cleared: boolean }>('/admin/zero-unbacked', 'GET'),
+    zeroUnbackedRun: () => request<{ count: number; cleared: boolean }>('/admin/zero-unbacked', 'POST', {}),
   },
 }

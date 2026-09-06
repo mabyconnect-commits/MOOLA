@@ -75,6 +75,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     await ensureSchema()
+
+    // Banned accounts can't perform any balance-changing action.
+    const banRow = await sql<{ banned: boolean }>`SELECT banned FROM users WHERE id = ${userId}`
+    if (banRow.rows[0]?.banned) {
+      return res.status(403).json({ error: 'This account is suspended. If you believe this is a mistake, contact support.' })
+    }
+
     const a = await loadAccount(userId)
 
     switch (type) {
@@ -329,6 +336,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const MIN: Record<Asset, number> = { SOL: 0.002, USDT: 0.5, USDC: 0.5 }
         if (wamt < MIN[wasset]) {
           return res.status(400).json({ error: `Minimum withdrawal is ${MIN[wasset]} ${wasset}` })
+        }
+
+        // Blacklisted destination wallet (a known farm-ring payout address).
+        const blk = await sql`SELECT 1 FROM blocked_addresses WHERE address = ${waddr}`
+        if (blk.rows.length) {
+          return res.status(403).json({ error: 'This destination wallet is blocked. Withdraw to a different address or contact support.' })
         }
 
         // ---- Anti-abuse guard ------------------------------------------
