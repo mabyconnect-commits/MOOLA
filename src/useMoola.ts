@@ -18,6 +18,7 @@ import {
   type AdminWithdrawer,
   type WithdrawDetail,
   type WalletDetail,
+  type FundedUser,
 } from './api'
 
 export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me' | 'admin'
@@ -110,6 +111,7 @@ interface MoolaState {
   adminUserDetail: WithdrawDetail | null
   adminWalletDetail: WalletDetail | null
   adminZeroCount: number | null
+  adminFunded: FundedUser[]
 }
 
 // Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
@@ -199,6 +201,7 @@ const initialState: MoolaState = {
   adminUserDetail: null,
   adminWalletDetail: null,
   adminZeroCount: null,
+  adminFunded: [],
 }
 
 function fmt(n: number, d: number): string {
@@ -766,13 +769,14 @@ export function useMoola() {
   const adminLoad = async () => {
     set({ adminBusy: true })
     try {
-      const [ov, wd, ab, wr] = await Promise.all([
+      const [ov, wd, ab, wr, fu] = await Promise.all([
         api.admin.overview(),
         api.admin.withdrawals(),
         api.admin.abuseReport(),
         api.admin.withdrawers(),
+        api.admin.fundedUsers(),
       ])
-      set({ adminOverview: ov, adminWithdrawals: wd.withdrawals, adminAbuse: ab, adminWithdrawers: wr.withdrawers })
+      set({ adminOverview: ov, adminWithdrawals: wd.withdrawals, adminAbuse: ab, adminWithdrawers: wr.withdrawers, adminFunded: fu.users })
     } catch (e) {
       flash(errMsg(e))
     } finally {
@@ -949,6 +953,7 @@ export function useMoola() {
     adminDepResult: s.adminDepResult,
     adminAbuse: s.adminAbuse,
     adminWithdrawers: s.adminWithdrawers,
+    adminFunded: s.adminFunded,
     adminUserDetail: s.adminUserDetail,
     adminWalletDetail: s.adminWalletDetail,
     onAdminDepQuery: onInput('adminDepQuery'),

@@ -176,6 +176,28 @@ export default function Admin({ v }: { v: MoolaVals }) {
         )}
       </div>
 
+      {/* Users with real withdrawable funds (>= $0.50) */}
+      <div style={css('display:flex;align-items:center;justify-content:space-between;margin-bottom:6px')}>
+        <span style={css('font-size:15px;font-weight:700')}>💰 Users with funds ({v.adminFunded.length})</span>
+        <span style={css('font-size:11px;color:#7ea98f')}>≥ $0.50 · tap</span>
+      </div>
+      <div style={css('font-size:11.5px;color:#7ea98f;margin-bottom:10px')}>Real withdrawable value (deposits + investor commission + own-stake rewards).</div>
+      {v.adminFunded.length === 0 && <div style={css('font-size:13px;color:#7ea98f;margin-bottom:18px')}>No accounts with withdrawable funds above $0.50.</div>}
+      {v.adminFunded.map((u) => (
+        <div key={u.id} onClick={() => v.adminUserDetailLoad(String(u.id))} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:12px;background:rgba(15,40,28,.5);border:1px solid rgba(35,211,154,.22);padding:11px 13px;margin-bottom:7px;cursor:pointer')}>
+          <div style={css('overflow:hidden')}>
+            <div style={css('font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{u.email || 'user #' + u.id}{u.banned ? ' 🚫' : ''} ›</div>
+            <div style={css('font-size:11px;color:#92b8a3')}>dep ${n(u.deposited_usd)} · comm ${n(u.commission_usd)} · wallet ₮{n(u.usdt)} ${n(u.usdc)} ◎{n(u.sol, 3)}</div>
+          </div>
+          <div style={css('text-align:right;flex-shrink:0;margin-left:8px')}>
+            <div style={css('font-size:15px;font-weight:800;color:#23d39a')}>${n(u.remaining_usd)}</div>
+            <div style={css('font-size:10px;color:#7ea98f')}>can withdraw</div>
+          </div>
+        </div>
+      ))}
+
+      <div style={css('height:16px')}></div>
+
       {/* Withdrawers — everyone cashing out, most active first */}
       <div style={css('display:flex;align-items:center;justify-content:space-between;margin-bottom:10px')}>
         <span style={css('font-size:15px;font-weight:700')}>Withdrawers ({v.adminWithdrawers.length})</span>
