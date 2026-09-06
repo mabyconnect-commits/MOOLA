@@ -77,13 +77,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             WHERE email = ${email}
           `
         } else {
+          // Cap accounts per IP (anti mass-farming). Rolling window by default so
+          // shared/NAT networks aren't permanently locked. MAX_ACCOUNTS_PER_IP=0
+          // disables; IP_WINDOW_HOURS=0 makes it an all-time cap.
+          const maxPerIp = Number(process.env.MAX_ACCOUNTS_PER_IP ?? '5')
+          const windowHours = Number(process.env.IP_WINDOW_HOURS ?? '24')
+          if (maxPerIp > 0 && ip && ip !== 'unknown') {
+            const count = windowHours > 0
+              ? await sql<{ n: number }>`SELECT count(*)::int AS n FROM users WHERE signup_ip = ${ip} AND created_at > now() - make_interval(hours => ${windowHours})`
+              : await sql<{ n: number }>`SELECT count(*)::int AS n FROM users WHERE signup_ip = ${ip}`
+            if (Number(count.rows[0]?.n || 0) >= maxPerIp) {
+              return res.status(429).json({ error: 'Too many accounts have been created from your network. Please try again later or contact support.' })
+            }
+          }
+
           // Capture the referrer (if the signup carried a ?ref code) and store
           // the new user's own code + upline chain up front.
           const referrer = await resolveReferrer(body.ref || '')
           const upline = buildUpline(referrer)
           await sql`
-            INSERT INTO users (email, password_hash, verify_code, verify_expires, ref_code, referred_by, upline)
-            VALUES (${email}, ${hash}, ${verifyCode}, ${expires}, ${genRefCode()}, ${referrer ? referrer.id : null}, ${upline}::bigint[])
+            INSERT INTO users (email, password_hash, verify_code, verify_expires, ref_code, referred_by, upline, signup_ip)
+            VALUES (${email}, ${hash}, ${verifyCode}, ${expires}, ${genRefCode()}, ${referrer ? referrer.id : null}, ${upline}::bigint[], ${ip || null})
           `
         }
 

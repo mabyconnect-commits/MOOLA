@@ -164,6 +164,9 @@ export function ensureSchema(): Promise<void> {
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS deposited_usd DOUBLE PRECISION NOT NULL DEFAULT 0`
       // Manual admin ban — a banned account is blocked from all money actions.
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`
+      // Signup IP — used to cap accounts-per-IP (anti mass-farming).
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_ip TEXT`
+      await sql`CREATE INDEX IF NOT EXISTS users_signup_ip_idx ON users(signup_ip)`
       // Blacklisted destination wallets — no account may ever withdraw to one.
       await sql`
         CREATE TABLE IF NOT EXISTS blocked_addresses (
