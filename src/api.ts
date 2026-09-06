@@ -209,8 +209,16 @@ export interface WithdrawDetail {
     usdt: number
     usdc: number
     deposited_usd: number
+    airdrop_claimed?: boolean
   } | null
   withdrawals: WithdrawalRow[]
+  downlines?: { total: number; invested: number; investedUsd: number }
+  sources?: {
+    airdropClaimed: boolean
+    lots: { source: string; amount: number }[]
+    commissionMoola: number
+    bonusMoola: number
+  }
 }
 
 export interface DepositLookup {
