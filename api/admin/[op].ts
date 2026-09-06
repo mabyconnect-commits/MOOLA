@@ -115,6 +115,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                  COUNT(*)::int AS n
           FROM withdrawals WHERE status IN ('pending', 'sent')`
 
+        // Total withdrawn (USD) + count over rolling windows: 24h / 7d / 30d / all.
+        const win = await sql<{ h24: number; d7: number; d30: number; all_usd: number; n24: number; n7: number; n30: number; n_all: number }>`
+          SELECT
+            COALESCE(SUM(usd) FILTER (WHERE created_at > now() - interval '24 hours'), 0) AS h24,
+            COALESCE(SUM(usd) FILTER (WHERE created_at > now() - interval '7 days'), 0)  AS d7,
+            COALESCE(SUM(usd) FILTER (WHERE created_at > now() - interval '30 days'), 0) AS d30,
+            COALESCE(SUM(usd), 0) AS all_usd,
+            COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours')::int AS n24,
+            COUNT(*) FILTER (WHERE created_at > now() - interval '7 days')::int  AS n7,
+            COUNT(*) FILTER (WHERE created_at > now() - interval '30 days')::int AS n30,
+            COUNT(*)::int AS n_all
+          FROM (
+            SELECT created_at, CASE WHEN asset = 'SOL' THEN amount * ${SOL_PRICE} ELSE amount END AS usd
+            FROM withdrawals WHERE status IN ('pending', 'sent')
+          ) w`
+        const w0 = win.rows[0]
+
         return res.status(200).json({
           rings: rings.rows,
           farmers: farmers.rows,
@@ -122,6 +139,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             depositedUsd: Number(totals.rows[0]?.deposited || 0),
             paidUsd: Number(paid.rows[0]?.paid || 0),
             payouts: Number(paid.rows[0]?.n || 0),
+          },
+          windows: {
+            h24: Number(w0?.h24 || 0), d7: Number(w0?.d7 || 0), d30: Number(w0?.d30 || 0), all: Number(w0?.all_usd || 0),
+            n24: Number(w0?.n24 || 0), n7: Number(w0?.n7 || 0), n30: Number(w0?.n30 || 0), nAll: Number(w0?.n_all || 0),
+          },
+        })
+      }
+
+      // ---- WALLET DETAIL: every account that paid ONE destination wallet ---
+      // Tap a ring wallet (e.g. the one paid by 18 accounts) to see exactly
+      // which accounts drained to it, each with its deposit backing + total.
+      case 'wallet-detail': {
+        const address = String((req.query.address as string) || '').trim()
+        if (!address) return res.status(400).json({ error: 'Pass ?address=' })
+        const accounts = await sql`
+          SELECT u.id, u.email, u.created_at,
+                 COALESCE(a.deposited_usd, 0) AS deposited_usd,
+                 COUNT(w.id)::int AS payouts,
+                 COALESCE(SUM(CASE WHEN w.asset = 'SOL' THEN w.amount * ${SOL_PRICE} ELSE w.amount END), 0) AS usd,
+                 MAX(w.created_at) AS last_at
+          FROM withdrawals w
+          JOIN users u ON u.id = w.user_id
+          LEFT JOIN accounts a ON a.user_id = w.user_id
+          WHERE w.address = ${address} AND w.status IN ('pending', 'sent')
+          GROUP BY u.id, u.email, u.created_at, a.deposited_usd
+          ORDER BY usd DESC`
+        const tot = await sql<{ usd: number; payouts: number; accounts: number }>`
+          SELECT COALESCE(SUM(CASE WHEN asset = 'SOL' THEN amount * ${SOL_PRICE} ELSE amount END), 0) AS usd,
+                 COUNT(*)::int AS payouts, COUNT(DISTINCT user_id)::int AS accounts
+          FROM withdrawals WHERE address = ${address} AND status IN ('pending', 'sent')`
+        return res.status(200).json({
+          address,
+          accounts: accounts.rows,
+          totals: {
+            usd: Number(tot.rows[0]?.usd || 0),
+            payouts: Number(tot.rows[0]?.payouts || 0),
+            accounts: Number(tot.rows[0]?.accounts || 0),
           },
         })
       }

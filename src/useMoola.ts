@@ -17,6 +17,7 @@ import {
   type AbuseReport,
   type AdminWithdrawer,
   type WithdrawDetail,
+  type WalletDetail,
 } from './api'
 
 export type Screen = 'home' | 'stake' | 'presale' | 'nft' | 'me' | 'admin'
@@ -107,6 +108,7 @@ interface MoolaState {
   adminAbuse: AbuseReport | null
   adminWithdrawers: AdminWithdrawer[]
   adminUserDetail: WithdrawDetail | null
+  adminWalletDetail: WalletDetail | null
 }
 
 // Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
@@ -194,6 +196,7 @@ const initialState: MoolaState = {
   adminAbuse: null,
   adminWithdrawers: [],
   adminUserDetail: null,
+  adminWalletDetail: null,
 }
 
 function fmt(n: number, d: number): string {
@@ -824,6 +827,20 @@ export function useMoola() {
     }
   }
   const adminCloseDetail = () => set({ adminUserDetail: null })
+  // Every account that paid a given destination wallet (tap a ring row).
+  const adminWalletDetail = async (address: string) => {
+    if (!address) return
+    set({ adminBusy: true })
+    try {
+      const r = await api.admin.walletDetail(address)
+      set({ adminWalletDetail: r })
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ adminBusy: false })
+    }
+  }
+  const adminCloseWallet = () => set({ adminWalletDetail: null })
   // Deposit investigation: look up a user's on-chain deposit address + balances.
   const adminDepLookup = async () => {
     const q = stateRef.current.adminDepQuery.trim()
@@ -884,11 +901,14 @@ export function useMoola() {
     adminAbuse: s.adminAbuse,
     adminWithdrawers: s.adminWithdrawers,
     adminUserDetail: s.adminUserDetail,
+    adminWalletDetail: s.adminWalletDetail,
     onAdminDepQuery: onInput('adminDepQuery'),
     adminDepLookup,
     adminDepReconcile,
     adminUserDetailLoad: adminUserDetail,
     adminCloseDetail,
+    adminWalletDetailLoad: adminWalletDetail,
+    adminCloseWallet,
     openAdmin,
     adminRefresh: adminLoad,
     adminResolve,

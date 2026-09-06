@@ -107,7 +107,7 @@ export default function Admin({ v }: { v: MoolaVals }) {
           <div style={css('font-size:11.5px;color:#c99;margin-bottom:12px')}>Real money in vs out, and who's draining it.</div>
 
           {/* money in vs out */}
-          <div style={css('display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px')}>
+          <div style={css('display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px')}>
             <div style={css('border-radius:11px;background:rgba(8,16,38,.4);padding:11px;text-align:center')}>
               <div style={css('font-size:11px;color:#92b8a3')}>Deposited (real in)</div>
               <div style={css('font-size:18px;font-weight:800;color:#23d39a')}>${n(v.adminAbuse.totals.depositedUsd)}</div>
@@ -118,26 +118,39 @@ export default function Admin({ v }: { v: MoolaVals }) {
             </div>
           </div>
 
-          {/* farm rings — one wallet, many accounts */}
-          <div style={css('font-size:12.5px;font-weight:700;margin-bottom:6px')}>Wallets paid by multiple accounts ({v.adminAbuse.rings.length})</div>
+          {/* withdrawn over time windows */}
+          {v.adminAbuse.windows && (
+            <div style={css('display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px;margin-bottom:14px')}>
+              {([['24h', v.adminAbuse.windows.h24, v.adminAbuse.windows.n24], ['7d', v.adminAbuse.windows.d7, v.adminAbuse.windows.n7], ['30d', v.adminAbuse.windows.d30, v.adminAbuse.windows.n30], ['All', v.adminAbuse.windows.all, v.adminAbuse.windows.nAll]] as const).map(([label, usd, cnt]) => (
+                <div key={label} style={css('border-radius:10px;background:rgba(8,16,38,.4);padding:9px 6px;text-align:center')}>
+                  <div style={css('font-size:10.5px;color:#92b8a3')}>{label}</div>
+                  <div style={css('font-size:13.5px;font-weight:800;color:#f2b34e')}>${n(usd)}</div>
+                  <div style={css('font-size:9.5px;color:#7ea98f')}>{cnt} out</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* farm rings — one wallet, many accounts (tap to see the accounts) */}
+          <div style={css('font-size:12.5px;font-weight:700;margin-bottom:6px')}>Wallets paid by multiple accounts ({v.adminAbuse.rings.length}) <span style={css('color:#7ea98f;font-weight:400')}>· tap</span></div>
           {v.adminAbuse.rings.length === 0 && <div style={css('font-size:12px;color:#7ea98f;margin-bottom:10px')}>None detected. 🎉</div>}
           {v.adminAbuse.rings.map((r) => (
-            <div key={r.address} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px')}>
+            <div key={r.address} onClick={() => v.adminWalletDetailLoad(r.address)} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px;cursor:pointer')}>
               <div style={css('overflow:hidden')}>
-                <div style={css('font-size:12.5px;font-weight:700;font-family:monospace')}>{r.address.slice(0, 6)}…{r.address.slice(-6)}</div>
+                <div style={css('font-size:12.5px;font-weight:700;font-family:monospace')}>{r.address.slice(0, 6)}…{r.address.slice(-6)} ›</div>
                 <div style={css('font-size:11px;color:#ff9d9d')}>{r.users} accounts · {r.payouts} payouts</div>
               </div>
               <div style={css('font-size:13px;font-weight:800;color:#f2b34e;flex-shrink:0;margin-left:8px')}>${n(r.usd)}</div>
             </div>
           ))}
 
-          {/* farmers — withdrew but never deposited */}
-          <div style={css('font-size:12.5px;font-weight:700;margin:12px 0 6px')}>Withdrew with $0 deposited ({v.adminAbuse.farmers.length})</div>
+          {/* farmers — withdrew but never deposited (tap for full details) */}
+          <div style={css('font-size:12.5px;font-weight:700;margin:12px 0 6px')}>Withdrew with $0 deposited ({v.adminAbuse.farmers.length}) <span style={css('color:#7ea98f;font-weight:400')}>· tap</span></div>
           {v.adminAbuse.farmers.length === 0 && <div style={css('font-size:12px;color:#7ea98f')}>None. 🎉</div>}
           {v.adminAbuse.farmers.map((f) => (
-            <div key={f.id} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px')}>
+            <div key={f.id} onClick={() => v.adminUserDetailLoad(String(f.id))} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px;cursor:pointer')}>
               <div style={css('overflow:hidden')}>
-                <div style={css('font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{f.email || 'user #' + f.id}</div>
+                <div style={css('font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{f.email || 'user #' + f.id} ›</div>
                 <div style={css('font-size:11px;color:#ff9d9d')}>{f.payouts} payouts · 0 deposited</div>
               </div>
               <div style={css('font-size:13px;font-weight:800;color:#ff8f8f;flex-shrink:0;margin-left:8px')}>${n(f.withdrawn_usd)}</div>
@@ -212,7 +225,7 @@ export default function Admin({ v }: { v: MoolaVals }) {
           </div>
         )
         return (
-          <div onClick={v.adminCloseDetail} style={css('position:fixed;inset:0;z-index:60;background:rgba(3,8,5,.8);display:flex;justify-content:center;align-items:flex-end')}>
+          <div onClick={v.adminCloseDetail} style={css('position:fixed;inset:0;z-index:62;background:rgba(3,8,5,.8);display:flex;justify-content:center;align-items:flex-end')}>
             <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 40px;max-height:92dvh;overflow-y:auto;animation:riseIn .3s ease')}>
               <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
               <div style={css('display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px')}>
@@ -264,6 +277,51 @@ export default function Admin({ v }: { v: MoolaVals }) {
                     <div style={css('font-size:10.5px;color:#92b8a3;font-family:monospace')}>{w.address.slice(0, 6)}…{w.address.slice(-6)}</div>
                   </div>
                   <div style={css('font-size:10.5px;color:#7ea98f;text-align:right;flex-shrink:0;margin-left:8px')}>{new Date(w.created_at).toLocaleDateString()}<br />{new Date(w.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ===== RING WALLET DETAILS OVERLAY (accounts that paid one wallet) ===== */}
+      {v.adminWalletDetail && (() => {
+        const w = v.adminWalletDetail
+        return (
+          <div onClick={v.adminCloseWallet} style={css('position:fixed;inset:0;z-index:60;background:rgba(3,8,5,.8);display:flex;justify-content:center;align-items:flex-end')}>
+            <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 40px;max-height:92dvh;overflow-y:auto;animation:riseIn .3s ease')}>
+              <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
+              <div style={css('display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px')}>
+                <div style={css('overflow:hidden')}>
+                  <div style={css('font-size:15px;font-weight:800')}>Destination wallet</div>
+                  <div style={css('font-size:11.5px;color:#cfe7da;font-family:monospace;word-break:break-all')}>{w.address}</div>
+                </div>
+                <div onClick={v.adminCloseWallet} style={css('width:32px;height:32px;border-radius:50%;background:rgba(6,22,14,.6);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;flex-shrink:0;margin-left:8px')}>✕</div>
+              </div>
+
+              <div style={css('display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0')}>
+                <div style={css('border-radius:10px;background:rgba(8,16,38,.4);padding:10px;text-align:center')}>
+                  <div style={css('font-size:10.5px;color:#92b8a3')}>Accounts</div>
+                  <div style={css('font-size:17px;font-weight:800;color:#ff9d9d')}>{w.totals.accounts}</div>
+                </div>
+                <div style={css('border-radius:10px;background:rgba(8,16,38,.4);padding:10px;text-align:center')}>
+                  <div style={css('font-size:10.5px;color:#92b8a3')}>Payouts</div>
+                  <div style={css('font-size:17px;font-weight:800')}>{w.totals.payouts}</div>
+                </div>
+                <div style={css('border-radius:10px;background:rgba(8,16,38,.4);padding:10px;text-align:center')}>
+                  <div style={css('font-size:10.5px;color:#92b8a3')}>Total</div>
+                  <div style={css('font-size:17px;font-weight:800;color:#f2b34e')}>${n(w.totals.usd)}</div>
+                </div>
+              </div>
+
+              <div style={css('font-size:13px;font-weight:700;margin-bottom:8px')}>Accounts that paid this wallet ({w.accounts.length}) <span style={css('color:#7ea98f;font-weight:400')}>· tap</span></div>
+              {w.accounts.map((u) => (
+                <div key={u.id} onClick={() => v.adminUserDetailLoad(String(u.id))} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px;cursor:pointer')}>
+                  <div style={css('overflow:hidden')}>
+                    <div style={css('font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{u.email || 'user #' + u.id} ›</div>
+                    <div style={css('font-size:11px;color:#92b8a3')}>{u.payouts} payouts · <span style={css('color:' + (u.deposited_usd > 0 ? '#23d39a' : '#ff8f8f'))}>{u.deposited_usd > 0 ? '$' + n(u.deposited_usd) + ' dep' : 'no deposit'}</span> · {new Date(u.created_at).toLocaleDateString()}</div>
+                  </div>
+                  <div style={css('font-size:13px;font-weight:800;color:#f2b34e;flex-shrink:0;margin-left:8px')}>${n(u.usd)}</div>
                 </div>
               ))}
             </div>
