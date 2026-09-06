@@ -144,6 +144,9 @@ export function ensureSchema(): Promise<void> {
         )
       `
       await sql`CREATE INDEX IF NOT EXISTS withdrawals_user_idx ON withdrawals(user_id)`
+      // Index the payout destination so the abuse report can group by address
+      // (spotting one wallet drained by many accounts — a farming ring).
+      await sql`CREATE INDEX IF NOT EXISTS withdrawals_address_idx ON withdrawals(address)`
       // Idempotency: a (user, client_key) pair maps to at most one withdrawal.
       // Must be a FULL unique index (not partial) so `ON CONFLICT (user_id,
       // client_key)` can match it. NULL client_keys stay distinct (Postgres
@@ -153,6 +156,12 @@ export function ensureSchema(): Promise<void> {
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS withdrawals_user_key_uq ON withdrawals(user_id, client_key)`
       // Per-user mutex so concurrent deposit-checks can't double-credit.
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS dep_lock TIMESTAMPTZ`
+      // Cumulative USD value of REAL on-chain deposits this account has ever
+      // been credited (survives sweeps, which reset dep_*). This is the anchor
+      // for the withdrawal guard: you can only cash out real money you brought
+      // in (deposits) plus what you genuinely earned (investor commission /
+      // rewards on real stake) — never free airdrop/bonus tokens.
+      await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS deposited_usd DOUBLE PRECISION NOT NULL DEFAULT 0`
       // Fixed-window rate limiting.
       await sql`CREATE TABLE IF NOT EXISTS rate_limits (k TEXT PRIMARY KEY, win BIGINT NOT NULL, n INT NOT NULL)`
 
@@ -179,6 +188,7 @@ export function ensureSchema(): Promise<void> {
       // Clears fake balances created by the old simulated deposit/buy. Runs
       // exactly once (tracked in app_meta), automatically on deploy.
       await sql`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, val TEXT)`
+
       const reset = await sql<{ key: string }>`SELECT key FROM app_meta WHERE key = 'reset_testdata_v1'`
       if (!reset.rows[0]) {
         await sql`UPDATE accounts SET

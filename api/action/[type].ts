@@ -21,6 +21,11 @@ import {
   loadTxns,
   saveAccount,
   loadStats,
+  WITHDRAW_GUARD,
+  assessWithdrawable,
+  withdrawFreezeCutoff,
+  assetUsd,
+  creditDepositedUsd,
 } from '../_lib/economics.js'
 
 type Ccy = 'USDT' | 'USDC'
@@ -182,6 +187,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         else if (asset === 'USDT') a.usdt += amt
         else a.usdc += amt
         await saveAccount(userId, a)
+        await creditDepositedUsd(userId, assetUsd(asset, amt))
         const dec = asset === 'SOL' ? 4 : 2
         await addTxn(userId, { icon: '⬇️', title: 'Deposit', sub: asset, amt: `+${fmt(amt, dec)} ${asset}`, pos: true })
         break
@@ -226,6 +232,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           a.usdt += newUsdt
           a.usdc += newUsdc
           await saveAccount(userId, a)
+          // Record the real value brought in, so it counts toward what the user
+          // is later allowed to withdraw.
+          await creditDepositedUsd(userId, newSol * SOL_PRICE + newUsdt + newUsdc)
           if (newSol > 0) await addTxn(userId, { icon: '⬇️', title: 'SOL deposit', sub: 'Solana', amt: `+${fmt(newSol, 4)} SOL`, pos: true })
           if (newUsdt > 0) await addTxn(userId, { icon: '⬇️', title: 'USDT deposit', sub: 'Solana (SPL)', amt: `+${fmt(newUsdt, 2)} USDT`, pos: true })
           if (newUsdc > 0) await addTxn(userId, { icon: '⬇️', title: 'USDC deposit', sub: 'Solana (SPL)', amt: `+${fmt(newUsdc, 2)} USDC`, pos: true })
@@ -320,6 +329,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const MIN: Record<Asset, number> = { SOL: 0.002, USDT: 0.5, USDC: 0.5 }
         if (wamt < MIN[wasset]) {
           return res.status(400).json({ error: `Minimum withdrawal is ${MIN[wasset]} ${wasset}` })
+        }
+
+        // ---- Anti-abuse guard ------------------------------------------
+        // Blocks the farming loop: cashing out free airdrop/bonus tokens (and
+        // the rewards they spin off) as real crypto. Runs BEFORE any withdrawal
+        // row is created so a rejected attempt leaves no trace to reconcile.
+        if (WITHDRAW_GUARD) {
+          const [cutoff, assess] = await Promise.all([withdrawFreezeCutoff(), assessWithdrawable(userId)])
+
+          // 1) Old accounts (the ones that existed when this shipped) are frozen.
+          if (cutoff !== null && assess.createdAt < cutoff) {
+            return res.status(403).json({
+              error: 'Withdrawals are disabled for this account. If you believe this is a mistake, contact support.',
+            })
+          }
+
+          // 2) Must have SOME legitimately-earned value (real deposit, or
+          //    commission from a downline who actually invested).
+          if (!assess.eligible) {
+            return res.status(403).json({
+              error:
+                'You can only withdraw real funds — your own deposits, or commission from referrals who actually invested. Free airdrop and bonus tokens can’t be withdrawn.',
+            })
+          }
+
+          // 3) Can't withdraw more than that legitimately-earned value.
+          const reqUsd = assetUsd(wasset, wamt)
+          if (reqUsd > assess.remainingUsd + 1e-6) {
+            const left = assess.remainingUsd.toFixed(2)
+            return res.status(403).json({
+              error: `This exceeds your withdrawable limit (≈ $${left}). Your limit is your deposits + commission from investing referrals + rewards on your own stake, minus what you've already withdrawn.`,
+            })
+          }
         }
 
         // Idempotency: claim the request by (user, client_key). A duplicate

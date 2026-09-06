@@ -246,4 +246,131 @@ export async function loadStats(): Promise<Stats> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Withdrawal safety guard
+//
+// The abuse we're stopping: accounts cashing out FREE money (the 200 $MOOLA
+// airdrop, referral signup bonuses, and the staking rewards those free tokens
+// generate) as real on-chain crypto — over and over, often to one wallet.
+//
+// The rule: a user may only withdraw up to the real value they legitimately
+// brought in or earned —
+//   • their own real deposits (USD), plus
+//   • commission from downlines who ACTUALLY deposited, plus
+//   • staking rewards on their OWN staked money (only if they've deposited),
+//   • minus everything already withdrawn.
+// No deposit and no investing downlines ⇒ nothing to withdraw.
+// ---------------------------------------------------------------------------
+
+// Master switch. Set WITHDRAW_GUARD=off to disable all the checks below in an
+// emergency (kept as an escape hatch; on by default).
+export const WITHDRAW_GUARD = (process.env.WITHDRAW_GUARD || 'on').trim().toLowerCase() !== 'off'
+
+/** Convert an asset amount to USD using the app's illustrative prices. */
+export function assetUsd(asset: 'SOL' | 'USDT' | 'USDC', amount: number): number {
+  return asset === 'SOL' ? amount * SOL_PRICE : amount
+}
+
+// Only accounts YOUNGER than this many hours may withdraw — a rolling window.
+// Someone who registered in the last 24h can cash out; older accounts (where
+// the abuse sits) are frozen. Set to 0 (or `off`) to disable the age freeze.
+const WITHDRAW_MAX_ACCOUNT_AGE_HOURS = (() => {
+  const raw = (process.env.WITHDRAW_MAX_ACCOUNT_AGE_HOURS || '24').trim().toLowerCase()
+  if (raw === 'off') return 0
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : 0
+})()
+
+/**
+ * Resolve the "freeze accounts created before" cutoff as an epoch (ms), or null
+ * when freezing is disabled. Any account created before this instant is frozen.
+ *
+ * Default: a ROLLING window — now minus WITHDRAW_MAX_ACCOUNT_AGE_HOURS (24h) —
+ * so registrations from the last 24 hours can withdraw and older accounts can't.
+ * WITHDRAW_FREEZE_BEFORE overrides with a FIXED cutoff (an ISO date, or `off` to
+ * disable freezing entirely).
+ */
+export async function withdrawFreezeCutoff(): Promise<number | null> {
+  const env = (process.env.WITHDRAW_FREEZE_BEFORE || '').trim()
+  if (env.toLowerCase() === 'off') return null
+  if (env) {
+    const t = Date.parse(env)
+    if (!Number.isNaN(t)) return t
+  }
+  if (WITHDRAW_MAX_ACCOUNT_AGE_HOURS <= 0) return null
+  return Date.now() - WITHDRAW_MAX_ACCOUNT_AGE_HOURS * 3600 * 1000
+}
+
+export interface WithdrawAssessment {
+  createdAt: number // account creation epoch (ms)
+  depositedUsd: number // cumulative real deposits
+  commissionUsd: number // commission from downlines who actually deposited
+  stakeRewardUsd: number // rewards on the user's own (non-airdrop) stake
+  earnedUsd: number // depositedUsd + commissionUsd + stakeRewardUsd
+  withdrawnUsd: number // already withdrawn (pending + sent)
+  remainingUsd: number // how much USD they may still withdraw
+  eligible: boolean // has ANY legitimate withdrawable value
+}
+
+/**
+ * Compute a user's withdrawal allowance. Pure read — safe to call for the guard
+ * and for admin visibility. All values are USD (at the app's sell/SOL prices).
+ */
+export async function assessWithdrawable(userId: number): Promise<WithdrawAssessment> {
+  const acc = await sql<{ deposited_usd: number; created_at: string }>`
+    SELECT COALESCE(a.deposited_usd, 0) AS deposited_usd, u.created_at
+    FROM users u LEFT JOIN accounts a ON a.user_id = u.id
+    WHERE u.id = ${userId}`
+  const depositedUsd = Number(acc.rows[0]?.deposited_usd || 0)
+  const createdAt = acc.rows[0]?.created_at ? Date.parse(acc.rows[0].created_at) : Date.now()
+
+  // Commission (in $MOOLA) earned ONLY from downlines who actually deposited
+  // real money — free-airdrop-only downlines don't unlock withdrawals upline.
+  const comm = await sql<{ c: number }>`
+    SELECT COALESCE(SUM(re.commission), 0) AS c
+    FROM referral_earnings re
+    JOIN accounts a ON a.user_id = re.from_user
+    WHERE re.beneficiary = ${userId} AND a.deposited_usd > 0`
+  const commissionUsd = Number(comm.rows[0]?.c || 0) * SELL_PRICE
+
+  // Rewards on the user's OWN stake (manual stake / compound — NOT the free
+  // airdrop or referral-bonus stake). Only credited to users who deposited, so
+  // a pure farmer can't turn free-token rewards into a cash-out.
+  let stakeRewardUsd = 0
+  if (depositedUsd > 0) {
+    const sr = await sql<{ r: number }>`
+      SELECT COALESCE(SUM(reward_paid), 0) AS r FROM stake_lots
+      WHERE user_id = ${userId} AND source IN ('stake', 'compound')`
+    stakeRewardUsd = Number(sr.rows[0]?.r || 0) * SELL_PRICE
+  }
+
+  // Everything already withdrawn (money that left, or is leaving, the treasury).
+  const wd = await sql<{ asset: string; amt: number }>`
+    SELECT asset, COALESCE(SUM(amount), 0) AS amt FROM withdrawals
+    WHERE user_id = ${userId} AND status IN ('pending', 'sent') GROUP BY asset`
+  let withdrawnUsd = 0
+  for (const r of wd.rows) {
+    withdrawnUsd += assetUsd(r.asset as 'SOL' | 'USDT' | 'USDC', Number(r.amt))
+  }
+
+  const earnedUsd = depositedUsd + commissionUsd + stakeRewardUsd
+  const remainingUsd = Math.max(0, earnedUsd - withdrawnUsd)
+  return {
+    createdAt,
+    depositedUsd,
+    commissionUsd,
+    stakeRewardUsd,
+    earnedUsd,
+    withdrawnUsd,
+    remainingUsd,
+    eligible: earnedUsd > 1e-9,
+  }
+}
+
+/** Record real deposited value against the withdrawal allowance. */
+export async function creditDepositedUsd(userId: number, usd: number): Promise<void> {
+  if (usd <= 0) return
+  await sql`UPDATE accounts SET deposited_usd = deposited_usd + ${usd} WHERE user_id = ${userId}`
+}
+
 export { fmt }

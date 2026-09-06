@@ -100,8 +100,77 @@ export default function Admin({ v }: { v: MoolaVals }) {
         )}
       </div>
 
+      {/* Abuse report — the withdrawal loop at a glance */}
+      {v.adminAbuse && (
+        <div style={css('border-radius:14px;background:rgba(40,20,20,.4);border:1px solid rgba(242,120,120,.28);padding:14px;margin-bottom:18px')}>
+          <div style={css('font-size:14px;font-weight:800;margin-bottom:2px;color:#ff9d9d')}>🚨 Abuse report</div>
+          <div style={css('font-size:11.5px;color:#c99;margin-bottom:12px')}>Real money in vs out, and who's draining it.</div>
+
+          {/* money in vs out */}
+          <div style={css('display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px')}>
+            <div style={css('border-radius:11px;background:rgba(8,16,38,.4);padding:11px;text-align:center')}>
+              <div style={css('font-size:11px;color:#92b8a3')}>Deposited (real in)</div>
+              <div style={css('font-size:18px;font-weight:800;color:#23d39a')}>${n(v.adminAbuse.totals.depositedUsd)}</div>
+            </div>
+            <div style={css('border-radius:11px;background:rgba(8,16,38,.4);padding:11px;text-align:center')}>
+              <div style={css('font-size:11px;color:#92b8a3')}>Paid out ({v.adminAbuse.totals.payouts})</div>
+              <div style={css('font-size:18px;font-weight:800;color:' + (v.adminAbuse.totals.paidUsd > v.adminAbuse.totals.depositedUsd ? '#ff8f8f' : '#f2b34e'))}>${n(v.adminAbuse.totals.paidUsd)}</div>
+            </div>
+          </div>
+
+          {/* farm rings — one wallet, many accounts */}
+          <div style={css('font-size:12.5px;font-weight:700;margin-bottom:6px')}>Wallets paid by multiple accounts ({v.adminAbuse.rings.length})</div>
+          {v.adminAbuse.rings.length === 0 && <div style={css('font-size:12px;color:#7ea98f;margin-bottom:10px')}>None detected. 🎉</div>}
+          {v.adminAbuse.rings.map((r) => (
+            <div key={r.address} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px')}>
+              <div style={css('overflow:hidden')}>
+                <div style={css('font-size:12.5px;font-weight:700;font-family:monospace')}>{r.address.slice(0, 6)}…{r.address.slice(-6)}</div>
+                <div style={css('font-size:11px;color:#ff9d9d')}>{r.users} accounts · {r.payouts} payouts</div>
+              </div>
+              <div style={css('font-size:13px;font-weight:800;color:#f2b34e;flex-shrink:0;margin-left:8px')}>${n(r.usd)}</div>
+            </div>
+          ))}
+
+          {/* farmers — withdrew but never deposited */}
+          <div style={css('font-size:12.5px;font-weight:700;margin:12px 0 6px')}>Withdrew with $0 deposited ({v.adminAbuse.farmers.length})</div>
+          {v.adminAbuse.farmers.length === 0 && <div style={css('font-size:12px;color:#7ea98f')}>None. 🎉</div>}
+          {v.adminAbuse.farmers.map((f) => (
+            <div key={f.id} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px')}>
+              <div style={css('overflow:hidden')}>
+                <div style={css('font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{f.email || 'user #' + f.id}</div>
+                <div style={css('font-size:11px;color:#ff9d9d')}>{f.payouts} payouts · 0 deposited</div>
+              </div>
+              <div style={css('font-size:13px;font-weight:800;color:#ff8f8f;flex-shrink:0;margin-left:8px')}>${n(f.withdrawn_usd)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Withdrawers — everyone cashing out, most active first */}
+      <div style={css('display:flex;align-items:center;justify-content:space-between;margin-bottom:10px')}>
+        <span style={css('font-size:15px;font-weight:700')}>Withdrawers ({v.adminWithdrawers.length})</span>
+        <span style={css('font-size:11px;color:#7ea98f')}>tap for details</span>
+      </div>
+      {v.adminWithdrawers.length === 0 && <div style={css('font-size:13px;color:#7ea98f;margin-bottom:18px')}>Nobody has withdrawn yet.</div>}
+      {v.adminWithdrawers.map((u) => (
+        <div key={u.id} onClick={() => v.adminUserDetailLoad(String(u.id))} style={css('border-radius:12px;background:rgba(15,40,28,.5);border:1px solid ' + (u.deposited_usd > 0 ? 'rgba(110,200,150,.14)' : 'rgba(242,120,120,.28)') + ';padding:11px 13px;margin-bottom:7px;cursor:pointer')}>
+          <div style={css('display:flex;justify-content:space-between;align-items:center')}>
+            <div style={css('overflow:hidden')}>
+              <div style={css('font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{u.email || 'user #' + u.id}</div>
+              <div style={css('font-size:11px;color:#92b8a3')}>
+                <b style={css('color:#f2b34e')}>{u.payouts}×</b> · {u.addresses} wallet{u.addresses === 1 ? '' : 's'} · {new Date(u.last_at).toLocaleDateString()}
+              </div>
+            </div>
+            <div style={css('text-align:right;flex-shrink:0;margin-left:8px')}>
+              <div style={css('font-size:14px;font-weight:800;color:#f2b34e')}>${n(u.withdrawn_usd)}</div>
+              <div style={css('font-size:10.5px;font-weight:700;color:' + (u.deposited_usd > 0 ? '#23d39a' : '#ff8f8f'))}>{u.deposited_usd > 0 ? '✓ $' + n(u.deposited_usd) + ' dep' : '⚠ no deposit'}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+
       {/* Pending withdrawals to resolve */}
-      <div style={css('font-size:15px;font-weight:700;margin-bottom:10px')}>Pending withdrawals ({pending.length})</div>
+      <div style={css('font-size:15px;font-weight:700;margin:20px 0 10px')}>Pending withdrawals ({pending.length})</div>
       {pending.length === 0 && <div style={css('font-size:13px;color:#7ea98f;margin-bottom:18px')}>None pending. 🎉</div>}
       {pending.map((w) => (
         <div key={w.id} style={css('border-radius:13px;background:rgba(15,40,28,.55);border:1px solid rgba(242,179,78,.3);padding:13px 14px;margin-bottom:9px')}>
@@ -109,6 +178,7 @@ export default function Admin({ v }: { v: MoolaVals }) {
             <div>
               <div style={css('font-size:14px;font-weight:700')}>{n(w.amount, w.asset === 'SOL' ? 4 : 2)} {w.asset}</div>
               <div style={css('font-size:11px;color:#92b8a3')}>{w.email || 'user #' + w.user_id} · {w.address.slice(0, 4)}…{w.address.slice(-4)}</div>
+              <div style={css('font-size:10.5px;font-weight:700;margin-top:2px;color:' + (w.deposited_usd > 0 ? '#23d39a' : '#ff8f8f'))}>{w.deposited_usd > 0 ? '✓ backed · $' + n(w.deposited_usd) + ' deposited' : '⚠ no deposit — free-token cash-out'}</div>
             </div>
             <div onClick={() => v.adminResolve(w.id)} style={css('padding:8px 14px;border-radius:12px;background:rgba(35,211,154,.16);color:#23d39a;font-weight:700;font-size:12.5px;cursor:pointer')}>Resolve</div>
           </div>
@@ -129,6 +199,77 @@ export default function Admin({ v }: { v: MoolaVals }) {
           <div style={css('font-size:11.5px;color:#7ea98f;text-align:right;flex-shrink:0;margin-left:8px')}>◎{n(u.sol, 3)}<br />₮{n(u.usdt)} ${n(u.usdc)}</div>
         </div>
       ))}
+
+      {/* ===== WITHDRAWER DETAILS OVERLAY ===== */}
+      {v.adminUserDetail && (() => {
+        const d = v.adminUserDetail
+        const a = d.assessment
+        const b = d.balances
+        const Row = ({ label, val, color }: { label: string; val: string; color?: string }) => (
+          <div style={css('display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid rgba(110,200,150,.1)')}>
+            <span style={css('color:#92b8a3')}>{label}</span>
+            <span style={css('font-weight:700;' + (color ? 'color:' + color : ''))}>{val}</span>
+          </div>
+        )
+        return (
+          <div onClick={v.adminCloseDetail} style={css('position:fixed;inset:0;z-index:60;background:rgba(3,8,5,.8);display:flex;justify-content:center;align-items:flex-end')}>
+            <div onClick={v.stop} style={css('width:440px;max-width:100vw;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#123322,#0a1d14);border-top:1px solid rgba(110,200,150,.25);padding:8px 18px 40px;max-height:92dvh;overflow-y:auto;animation:riseIn .3s ease')}>
+              <div style={css('width:42px;height:4px;border-radius:3px;background:rgba(150,210,180,.35);margin:8px auto 16px')}></div>
+              <div style={css('display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px')}>
+                <div style={css('overflow:hidden')}>
+                  <div style={css('font-size:17px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{d.user.email}</div>
+                  <div style={css('font-size:11.5px;color:#7ea98f')}>#{d.user.id} · joined {new Date(d.user.createdAt).toLocaleString()}</div>
+                </div>
+                <div onClick={v.adminCloseDetail} style={css('width:32px;height:32px;border-radius:50%;background:rgba(6,22,14,.6);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;flex-shrink:0;margin-left:8px')}>✕</div>
+              </div>
+
+              {/* verdict */}
+              <div style={css('border-radius:12px;padding:12px 14px;margin:12px 0;text-align:center;background:' + (a.eligible && a.remainingUsd > 0 ? 'rgba(35,211,154,.14)' : 'rgba(242,120,120,.16)') + ';border:1px solid ' + (a.eligible && a.remainingUsd > 0 ? 'rgba(35,211,154,.4)' : 'rgba(242,120,120,.4)'))}>
+                <div style={css('font-size:11.5px;color:#bfe3d0')}>CAN STILL WITHDRAW</div>
+                <div style={css('font-size:26px;font-weight:800;color:' + (a.eligible && a.remainingUsd > 0 ? '#23d39a' : '#ff8f8f'))}>${n(a.remainingUsd)}</div>
+                <div style={css('font-size:11.5px;color:#92b8a3')}>{a.eligible ? 'has legitimately-earned value' : '⚠ no real deposit or investor commission'}</div>
+              </div>
+
+              {/* eligibility breakdown */}
+              <div style={css('font-size:13px;font-weight:700;margin-bottom:4px')}>Withdrawal allowance (USD)</div>
+              <div style={css('border-radius:12px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.14);padding:6px 14px;margin-bottom:14px')}>
+                <Row label="Own deposits" val={'$' + n(a.depositedUsd)} color="#23d39a" />
+                <Row label="Commission (real investors)" val={'$' + n(a.commissionUsd)} />
+                <Row label="Rewards on own stake" val={'$' + n(a.stakeRewardUsd)} />
+                <Row label="Already withdrawn" val={'−$' + n(a.withdrawnUsd)} color="#ff8f8f" />
+                <div style={css('display:flex;justify-content:space-between;padding:9px 0 4px;font-size:14px')}>
+                  <span style={css('font-weight:800')}>Remaining limit</span>
+                  <span style={css('font-weight:800;color:#f2b34e')}>${n(a.remainingUsd)}</span>
+                </div>
+              </div>
+
+              {/* current balances */}
+              {b && (
+                <>
+                  <div style={css('font-size:13px;font-weight:700;margin-bottom:4px')}>Current balances</div>
+                  <div style={css('border-radius:12px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.14);padding:6px 14px;margin-bottom:14px')}>
+                    <Row label="$MOOLA (staked / avail)" val={n(b.staked, 0) + ' / ' + n(b.available, 0)} />
+                    <Row label="Wallet" val={'◎' + n(b.sol, 4) + ' · ₮' + n(b.usdt) + ' · $' + n(b.usdc)} />
+                  </div>
+                </>
+              )}
+
+              {/* every withdrawal */}
+              <div style={css('font-size:13px;font-weight:700;margin-bottom:8px')}>All withdrawals ({d.withdrawals.length})</div>
+              {d.withdrawals.length === 0 && <div style={css('font-size:12.5px;color:#7ea98f')}>None.</div>}
+              {d.withdrawals.map((w) => (
+                <div key={w.id} style={css('display:flex;justify-content:space-between;align-items:center;border-radius:10px;background:rgba(8,16,38,.35);padding:9px 11px;margin-bottom:6px')}>
+                  <div style={css('overflow:hidden')}>
+                    <div style={css('font-size:13px;font-weight:700')}>{n(w.amount, w.asset === 'SOL' ? 4 : 2)} {w.asset} <span style={css('font-size:10.5px;font-weight:700;color:' + (w.status === 'sent' ? '#23d39a' : w.status === 'pending' ? '#f2b34e' : '#7ea98f'))}>· {w.status}</span></div>
+                    <div style={css('font-size:10.5px;color:#92b8a3;font-family:monospace')}>{w.address.slice(0, 6)}…{w.address.slice(-6)}</div>
+                  </div>
+                  <div style={css('font-size:10.5px;color:#7ea98f;text-align:right;flex-shrink:0;margin-left:8px')}>{new Date(w.created_at).toLocaleDateString()}<br />{new Date(w.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

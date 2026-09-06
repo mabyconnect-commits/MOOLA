@@ -113,6 +113,7 @@ export interface AdminWithdrawal {
   status: string
   signature: string | null
   created_at: string
+  deposited_usd: number
 }
 export interface AdminUser {
   id: number
@@ -125,6 +126,72 @@ export interface AdminUser {
   sol: number
   usdt: number
   usdc: number
+  deposited_usd: number
+}
+
+export interface AbuseRing {
+  address: string
+  payouts: number
+  users: number
+  usd: number
+  last_at: string
+}
+export interface AbuseFarmer {
+  id: number
+  email: string
+  created_at: string
+  deposited_usd: number
+  payouts: number
+  withdrawn_usd: number
+}
+export interface AbuseReport {
+  rings: AbuseRing[]
+  farmers: AbuseFarmer[]
+  totals: { depositedUsd: number; paidUsd: number; payouts: number }
+}
+export interface WithdrawAssessment {
+  createdAt: number
+  depositedUsd: number
+  commissionUsd: number
+  stakeRewardUsd: number
+  earnedUsd: number
+  withdrawnUsd: number
+  remainingUsd: number
+  eligible: boolean
+}
+export interface AdminWithdrawer {
+  id: number
+  email: string
+  created_at: string
+  deposited_usd: number
+  payouts: number
+  addresses: number
+  withdrawn_usd: number
+  first_at: string
+  last_at: string
+}
+export interface WithdrawalRow {
+  id: number
+  asset: string
+  amount: number
+  address: string
+  status: string
+  signature: string | null
+  created_at: string
+}
+export interface WithdrawDetail {
+  user: { id: number; email: string; createdAt: string; depositIndex: number | null }
+  assessment: WithdrawAssessment
+  balances: {
+    balance: number
+    staked: number
+    available: number
+    sol: number
+    usdt: number
+    usdc: number
+    deposited_usd: number
+  } | null
+  withdrawals: WithdrawalRow[]
 }
 
 export interface DepositLookup {
@@ -208,5 +275,9 @@ export const api = {
         'POST',
         { id },
       ),
+    abuseReport: () => request<AbuseReport>('/admin/abuse-report', 'GET'),
+    withdrawers: () => request<{ withdrawers: AdminWithdrawer[] }>('/admin/withdrawers', 'GET'),
+    withdrawCheck: (q: string) =>
+      request<WithdrawDetail>('/admin/withdraw-check?q=' + encodeURIComponent(q), 'GET'),
   },
 }
