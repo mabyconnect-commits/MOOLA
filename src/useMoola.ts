@@ -109,6 +109,7 @@ interface MoolaState {
   adminWithdrawers: AdminWithdrawer[]
   adminUserDetail: WithdrawDetail | null
   adminWalletDetail: WalletDetail | null
+  adminZeroCount: number | null
 }
 
 // Launch-stat baseline — mirrors the server (economics.ts) so the UI shows
@@ -197,6 +198,7 @@ const initialState: MoolaState = {
   adminWithdrawers: [],
   adminUserDetail: null,
   adminWalletDetail: null,
+  adminZeroCount: null,
 }
 
 function fmt(n: number, d: number): string {
@@ -841,6 +843,53 @@ export function useMoola() {
     }
   }
   const adminCloseWallet = () => set({ adminWalletDetail: null })
+  // Ban / unban a user, then refresh their open detail panel.
+  const adminBanUser = async (id: number, banned: boolean) => {
+    try {
+      await api.admin.banUser(id, banned)
+      flash(banned ? '🚫 Account banned' : '✅ Account unbanned')
+      await adminUserDetail(String(id))
+      adminLoad()
+    } catch (e) {
+      flash(errMsg(e))
+    }
+  }
+  // Block / unblock a destination wallet, then refresh the open wallet panel.
+  const adminBlockAddress = async (address: string, blocked: boolean) => {
+    try {
+      await api.admin.blockAddress(address, blocked)
+      flash(blocked ? '🚫 Wallet blocked' : '✅ Wallet unblocked')
+      await adminWalletDetail(address)
+      adminLoad()
+    } catch (e) {
+      flash(errMsg(e))
+    }
+  }
+  // Zero unbacked balances — preview count first, then run on confirm.
+  const adminZeroPreview = async () => {
+    try {
+      const r = await api.admin.zeroUnbackedPreview()
+      set({ adminZeroCount: r.count })
+      if (r.count === 0) flash('No unbacked balances to clear 🎉')
+    } catch (e) {
+      flash(errMsg(e))
+    }
+  }
+  const adminZeroRun = async () => {
+    if (stateRef.current.adminBusy) return
+    set({ adminBusy: true })
+    try {
+      const r = await api.admin.zeroUnbackedRun()
+      flash(`Cleared ${r.count} unbacked account${r.count === 1 ? '' : 's'}`)
+      set({ adminZeroCount: null })
+      await adminLoad()
+    } catch (e) {
+      flash(errMsg(e))
+    } finally {
+      set({ adminBusy: false })
+    }
+  }
+  const adminZeroCancel = () => set({ adminZeroCount: null })
   // Deposit investigation: look up a user's on-chain deposit address + balances.
   const adminDepLookup = async () => {
     const q = stateRef.current.adminDepQuery.trim()
@@ -909,6 +958,12 @@ export function useMoola() {
     adminCloseDetail,
     adminWalletDetailLoad: adminWalletDetail,
     adminCloseWallet,
+    adminBanUser,
+    adminBlockAddress,
+    adminZeroCount: s.adminZeroCount,
+    adminZeroPreview,
+    adminZeroRun,
+    adminZeroCancel,
     openAdmin,
     adminRefresh: adminLoad,
     adminResolve,

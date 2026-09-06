@@ -6,6 +6,7 @@ import { ensureAccount, loadAccount, loadTxns } from '../_lib/economics.js'
 import { buildUpline, distributeAirdropCommission, genRefCode, loadReferral, resolveReferrer } from '../_lib/referral.js'
 import { clientIp, rateLimit } from '../_lib/ratelimit.js'
 import { isAdminEmail } from '../_lib/admin.js'
+import { isBlockedEmailDomain } from '../_lib/email-blocklist.js'
 
 interface UserRow {
   id: number
@@ -49,6 +50,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ---- SIGNUP ---------------------------------------------------------
       case 'signup': {
         if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Enter a valid email' })
+        if (isBlockedEmailDomain(email)) {
+          return res.status(400).json({ error: 'Please sign up with a real, permanent email address (temporary/disposable emails aren’t allowed).' })
+        }
         if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' })
 
         const existing = await sql<UserRow>`SELECT * FROM users WHERE email = ${email}`

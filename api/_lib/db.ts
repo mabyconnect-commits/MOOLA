@@ -162,6 +162,16 @@ export function ensureSchema(): Promise<void> {
       // in (deposits) plus what you genuinely earned (investor commission /
       // rewards on real stake) — never free airdrop/bonus tokens.
       await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS deposited_usd DOUBLE PRECISION NOT NULL DEFAULT 0`
+      // Manual admin ban — a banned account is blocked from all money actions.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`
+      // Blacklisted destination wallets — no account may ever withdraw to one.
+      await sql`
+        CREATE TABLE IF NOT EXISTS blocked_addresses (
+          address    TEXT PRIMARY KEY,
+          reason     TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `
       // Fixed-window rate limiting.
       await sql`CREATE TABLE IF NOT EXISTS rate_limits (k TEXT PRIMARY KEY, win BIGINT NOT NULL, n INT NOT NULL)`
 
