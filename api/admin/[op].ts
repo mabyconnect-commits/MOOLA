@@ -220,19 +220,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!u) return res.status(404).json({ error: 'No user matches that email/id' })
 
         const assess = await assessWithdrawable(u.id)
-        const bal = await sql<{ balance: number; staked: number; available: number; sol: number; usdt: number; usdc: number; deposited_usd: number }>`
+        const bal = await sql<{ balance: number; staked: number; available: number; sol: number; usdt: number; usdc: number; deposited_usd: number; airdrop_claimed: boolean }>`
           SELECT COALESCE(balance,0) AS balance, COALESCE(staked,0) AS staked, COALESCE(available,0) AS available,
                  COALESCE(sol,0) AS sol, COALESCE(usdt,0) AS usdt, COALESCE(usdc,0) AS usdc,
-                 COALESCE(deposited_usd,0) AS deposited_usd
+                 COALESCE(deposited_usd,0) AS deposited_usd, COALESCE(airdrop_claimed,false) AS airdrop_claimed
           FROM accounts WHERE user_id = ${u.id}`
         const wds = await sql`
           SELECT id, asset, amount, address, status, signature, created_at
           FROM withdrawals WHERE user_id = ${u.id} ORDER BY created_at DESC LIMIT 100`
+
+        // Downline picture — who this user referred, and how many actually put
+        // real money in. This is what legitimately unlocks withdrawals.
+        const dl = await sql<{ total: number; invested: number; invested_usd: number }>`
+          SELECT COUNT(*)::int AS total,
+                 COUNT(*) FILTER (WHERE COALESCE(a.deposited_usd,0) > 0)::int AS invested,
+                 COALESCE(SUM(a.deposited_usd),0) AS invested_usd
+          FROM users du LEFT JOIN accounts a ON a.user_id = du.id
+          WHERE ${u.id}::bigint = ANY(du.upline)`
+
+        // Where their $MOOLA came from — stake lots by source + referral earnings.
+        // Sources: airdrop / airdrop_ref (FREE) vs stake / compound (their own).
+        const lots = await sql<{ source: string; amt: number }>`
+          SELECT source, COALESCE(SUM(amount),0) AS amt FROM stake_lots WHERE user_id = ${u.id} GROUP BY source`
+        const earn = await sql<{ commission: number; bonus: number }>`
+          SELECT COALESCE(SUM(commission),0) AS commission, COALESCE(SUM(bonus),0) AS bonus
+          FROM referral_earnings WHERE beneficiary = ${u.id}`
+
         return res.status(200).json({
           user: { id: u.id, email: u.email, createdAt: u.created_at, depositIndex: u.deposit_index },
           assessment: assess,
           balances: bal.rows[0] || null,
           withdrawals: wds.rows,
+          downlines: {
+            total: Number(dl.rows[0]?.total || 0),
+            invested: Number(dl.rows[0]?.invested || 0),
+            investedUsd: Number(dl.rows[0]?.invested_usd || 0),
+          },
+          sources: {
+            airdropClaimed: Boolean(bal.rows[0]?.airdrop_claimed),
+            lots: lots.rows.map((l) => ({ source: l.source, amount: Number(l.amt) })),
+            commissionMoola: Number(earn.rows[0]?.commission || 0),
+            bonusMoola: Number(earn.rows[0]?.bonus || 0),
+          },
         })
       }
 

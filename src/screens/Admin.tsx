@@ -267,6 +267,46 @@ export default function Admin({ v }: { v: MoolaVals }) {
                 </>
               )}
 
+              {/* downlines — who they referred & who actually invested */}
+              {d.downlines && (
+                <>
+                  <div style={css('font-size:13px;font-weight:700;margin-bottom:4px')}>Downlines (referrals)</div>
+                  <div style={css('border-radius:12px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.14);padding:6px 14px;margin-bottom:14px')}>
+                    <Row label="Total referred" val={String(d.downlines.total)} />
+                    <Row label="Who actually deposited" val={String(d.downlines.invested)} color={d.downlines.invested > 0 ? '#23d39a' : '#ff8f8f'} />
+                    <Row label="Their total deposits" val={'$' + n(d.downlines.investedUsd)} color={d.downlines.investedUsd > 0 ? '#23d39a' : '#ff8f8f'} />
+                  </div>
+                </>
+              )}
+
+              {/* where their $MOOLA came from */}
+              {d.sources && (
+                <>
+                  <div style={css('font-size:13px;font-weight:700;margin-bottom:4px')}>Where their $MOOLA came from</div>
+                  <div style={css('border-radius:12px;background:rgba(6,22,14,.5);border:1px solid rgba(110,200,150,.14);padding:6px 14px;margin-bottom:8px')}>
+                    {d.sources.airdropClaimed && <Row label="🎁 Free airdrop claimed" val="200 $MOOLA" color="#ff8f8f" />}
+                    {d.sources.lots.map((l) => {
+                      const label = l.source === 'airdrop' ? '🎁 Airdrop stake (free)'
+                        : l.source === 'airdrop_ref' ? '🎁 Referral bonus (free)'
+                        : l.source === 'stake' ? '🔒 Own manual stake'
+                        : l.source === 'compound' ? '🔁 Compounded rewards'
+                        : l.source === 'legacy' ? '📦 Legacy stake'
+                        : l.source
+                      const free = l.source === 'airdrop' || l.source === 'airdrop_ref'
+                      return <Row key={l.source} label={label} val={n(l.amount, 2) + ' $MOOLA'} color={free ? '#ff8f8f' : '#cfe7da'} />
+                    })}
+                    <Row label="🤝 Referral commission" val={n(d.sources.commissionMoola, 2) + ' $MOOLA'} />
+                    <Row label="🎁 Airdrop referral bonus" val={n(d.sources.bonusMoola, 2) + ' $MOOLA'} color="#ff8f8f" />
+                  </div>
+                  {/* plain-English verdict on HOW/why */}
+                  <div style={css('border-radius:12px;padding:11px 13px;margin-bottom:14px;font-size:12px;line-height:1.5;background:' + (a.eligible ? 'rgba(242,179,78,.1)' : 'rgba(242,120,120,.12)') + ';border:1px solid ' + (a.eligible ? 'rgba(242,179,78,.3)' : 'rgba(242,120,120,.35)'))}>
+                    {a.eligible
+                      ? '✅ This account has real backing (deposit or investor commission), so a capped withdrawal is legitimate.'
+                      : '🚫 No deposit and no downline ever invested — this account should NOT be able to withdraw. Any past payouts here were made BEFORE the safety guard shipped (the old code had no checks). It is blocked now.'}
+                  </div>
+                </>
+              )}
+
               {/* every withdrawal */}
               <div style={css('font-size:13px;font-weight:700;margin-bottom:8px')}>All withdrawals ({d.withdrawals.length})</div>
               {d.withdrawals.length === 0 && <div style={css('font-size:12.5px;color:#7ea98f')}>None.</div>}
