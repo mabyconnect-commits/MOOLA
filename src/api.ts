@@ -144,10 +144,29 @@ export interface AbuseFarmer {
   payouts: number
   withdrawn_usd: number
 }
+export interface AbuseWindows {
+  h24: number; d7: number; d30: number; all: number
+  n24: number; n7: number; n30: number; nAll: number
+}
 export interface AbuseReport {
   rings: AbuseRing[]
   farmers: AbuseFarmer[]
   totals: { depositedUsd: number; paidUsd: number; payouts: number }
+  windows?: AbuseWindows
+}
+export interface WalletAccount {
+  id: number
+  email: string
+  created_at: string
+  deposited_usd: number
+  payouts: number
+  usd: number
+  last_at: string
+}
+export interface WalletDetail {
+  address: string
+  accounts: WalletAccount[]
+  totals: { usd: number; payouts: number; accounts: number }
 }
 export interface WithdrawAssessment {
   createdAt: number
@@ -277,6 +296,8 @@ export const api = {
       ),
     abuseReport: () => request<AbuseReport>('/admin/abuse-report', 'GET'),
     withdrawers: () => request<{ withdrawers: AdminWithdrawer[] }>('/admin/withdrawers', 'GET'),
+    walletDetail: (address: string) =>
+      request<WalletDetail>('/admin/wallet-detail?address=' + encodeURIComponent(address), 'GET'),
     withdrawCheck: (q: string) =>
       request<WithdrawDetail>('/admin/withdraw-check?q=' + encodeURIComponent(q), 'GET'),
   },
