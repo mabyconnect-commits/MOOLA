@@ -9,6 +9,7 @@ import {
   assessWithdrawable,
   creditDepositedUsd,
   SOL_PRICE,
+  SELL_PRICE,
 } from '../_lib/economics.js'
 
 // All admin operations live behind requireAdmin (server-side allowlist check).
@@ -264,6 +265,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ORDER BY payouts DESC, withdrawn_usd DESC
           LIMIT 100`
         return res.status(200).json({ withdrawers: rows.rows })
+      }
+
+      // ---- FUNDED USERS: who actually has withdrawable money -------------
+      // Real customers, ranked by how much they can legitimately withdraw
+      // (deposits + investor commission + rewards on own stake − already
+      // withdrawn), filtered to remaining >= ?min (default $0.50). This is the
+      // inverse of the abuse report: the accounts that genuinely have value.
+      case 'funded-users': {
+        const min = Number(req.query.min) > 0 ? Number(req.query.min) : 0.5
+        const rows = await sql`
+          SELECT * FROM (
+            SELECT u.id, u.email, u.created_at, COALESCE(u.banned,false) AS banned,
+                   COALESCE(a.deposited_usd,0) AS deposited_usd,
+                   COALESCE(c.commission,0) * ${SELL_PRICE} AS commission_usd,
+                   CASE WHEN COALESCE(a.deposited_usd,0) > 0 THEN COALESCE(s.rp,0) * ${SELL_PRICE} ELSE 0 END AS stake_reward_usd,
+                   COALESCE(w.wusd,0) AS withdrawn_usd,
+                   COALESCE(a.sol,0) AS sol, COALESCE(a.usdt,0) AS usdt, COALESCE(a.usdc,0) AS usdc,
+                   GREATEST(0,
+                     COALESCE(a.deposited_usd,0)
+                     + COALESCE(c.commission,0) * ${SELL_PRICE}
+                     + (CASE WHEN COALESCE(a.deposited_usd,0) > 0 THEN COALESCE(s.rp,0) * ${SELL_PRICE} ELSE 0 END)
+                     - COALESCE(w.wusd,0)
+                   ) AS remaining_usd
+            FROM accounts a
+            JOIN users u ON u.id = a.user_id
+            LEFT JOIN (
+              SELECT re.beneficiary AS uid, SUM(re.commission) AS commission
+              FROM referral_earnings re
+              JOIN accounts a2 ON a2.user_id = re.from_user AND COALESCE(a2.deposited_usd,0) > 0
+              GROUP BY re.beneficiary
+            ) c ON c.uid = a.user_id
+            LEFT JOIN (
+              SELECT user_id AS uid, SUM(reward_paid) AS rp FROM stake_lots
+              WHERE source IN ('stake','compound') GROUP BY user_id
+            ) s ON s.uid = a.user_id
+            LEFT JOIN (
+              SELECT user_id AS uid, SUM(CASE WHEN asset='SOL' THEN amount * ${SOL_PRICE} ELSE amount END) AS wusd
+              FROM withdrawals WHERE status IN ('pending','sent') GROUP BY user_id
+            ) w ON w.uid = a.user_id
+          ) t
+          WHERE t.remaining_usd >= ${min}
+          ORDER BY t.remaining_usd DESC
+          LIMIT 200`
+        return res.status(200).json({ users: rows.rows, min })
       }
 
       // ---- WITHDRAWAL DETAILS for one user ------------------------------

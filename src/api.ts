@@ -144,6 +144,20 @@ export interface AbuseFarmer {
   payouts: number
   withdrawn_usd: number
 }
+export interface FundedUser {
+  id: number
+  email: string
+  created_at: string
+  banned: boolean
+  deposited_usd: number
+  commission_usd: number
+  stake_reward_usd: number
+  withdrawn_usd: number
+  remaining_usd: number
+  sol: number
+  usdt: number
+  usdc: number
+}
 export interface AbuseWindows {
   h24: number; d7: number; d30: number; all: number
   n24: number; n7: number; n30: number; nAll: number
@@ -315,5 +329,7 @@ export const api = {
       request<{ address: string; blocked: boolean }>('/admin/block-address', 'POST', { address, blocked }),
     zeroUnbackedPreview: () => request<{ count: number; cleared: boolean }>('/admin/zero-unbacked', 'GET'),
     zeroUnbackedRun: () => request<{ count: number; cleared: boolean }>('/admin/zero-unbacked', 'POST', {}),
+    fundedUsers: (min?: number) =>
+      request<{ users: FundedUser[]; min: number }>('/admin/funded-users' + (min ? '?min=' + min : ''), 'GET'),
   },
 }
