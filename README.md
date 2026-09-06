@@ -98,3 +98,22 @@ against these flows until that's built.
 
 Local full-stack dev: `npm run dev:full` (runs `vercel dev`, serving the SPA
 and `/api` together). `npm run dev` runs the UI only (no backend).
+
+## Withdrawal safety & anti-abuse
+
+Withdrawals are guarded server-side so free tokens can't be cashed out as real
+crypto:
+
+- **Rolling age freeze** — only accounts newer than
+  `WITHDRAW_MAX_ACCOUNT_AGE_HOURS` (default 24) can withdraw; older accounts are
+  blocked. `WITHDRAW_FREEZE_BEFORE` sets a fixed cutoff instead; `off` disables.
+- **Real-earnings cap** — a withdrawal can never exceed the user's own deposits
+  + commission from referrals who actually deposited + staking rewards on their
+  own stake, minus what they've already withdrawn. No deposit and no investing
+  downlines ⇒ nothing to withdraw.
+- **Master switch** — `WITHDRAW_GUARD=off` disables the guard in an emergency.
+
+The **Admin** dashboard surfaces the abuse: a Withdrawers list (most-active
+first, tap for a full per-user breakdown), an abuse report (money in vs out,
+wallets paid by many accounts, $0-deposit cash-outs), and deposit-backing on
+every pending payout. Set `ADMIN_EMAILS` to grant access.
